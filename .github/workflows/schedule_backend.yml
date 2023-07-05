@@ -18,7 +18,7 @@
 name: Schedule Backend
 on:
   schedule:
-    - cron: '0 0 03 * * ?'
+    - cron: '0 0 03 * *'
 
 concurrency:
   group: backend-${{ github.event.pull_request.number || github.ref }}
@@ -26,7 +26,7 @@ concurrency:
 
 jobs:
   license-header:
-    if: github.repository == 'apache/incubator-seatunnel'
+    if: github.repository == 'apache/seatunnel'
     name: License header
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -38,7 +38,7 @@ jobs:
         uses: apache/skywalking-eyes@985866ce7e324454f61e22eb2db2e998db09d6f3
 
   code-style:
-    if: github.repository == 'apache/incubator-seatunnel'
+    if: github.repository == 'apache/seatunnel'
     name: Code style
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -47,10 +47,10 @@ jobs:
         with:
           submodules: true
       - name: Check code style
-        run: ./mvnw --batch-mode --quiet --no-snapshot-updates clean checkstyle:check
+        run: ./mvnw --batch-mode --quiet --no-snapshot-updates clean spotless:check
 
   dead-link:
-    if: github.repository == 'apache/incubator-seatunnel'
+    if: github.repository == 'apache/seatunnel'
     name: Dead links
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -63,7 +63,7 @@ jobs:
           done
 
   sanity-check:
-    if: github.repository == 'apache/incubator-seatunnel'
+    if: github.repository == 'apache/seatunnel'
     name: Sanity check results
     needs: [ license-header, code-style, dead-link ]
     runs-on: ubuntu-latest
@@ -95,7 +95,6 @@ jobs:
           -D"maven.test.skip"=true
           -D"maven.javadoc.skip"=true
           -D"scalastyle.skip"=true
-          -D"checkstyle.skip"=true
           -D"license.skipAddThirdParty"
       - name: Check Dependencies Licenses
         run: tools/dependencies/checkLicense.sh
@@ -118,7 +117,7 @@ jobs:
           cache: 'maven'
       - name: run all modules unit test
         run: |
-          ./mvnw -B -T 1C clean verify -D"maven.test.skip"=false -D"checkstyle.skip"=true -D"scalastyle.skip"=true -D"license.skipAddThirdParty"=true --no-snapshot-updates
+          ./mvnw -B -T 1C clean verify -D"maven.test.skip"=false -D"scalastyle.skip"=true -D"license.skipAddThirdParty"=true --no-snapshot-updates
         env:
           MAVEN_OPTS: -Xmx2048m
 
@@ -140,7 +139,7 @@ jobs:
           cache: 'maven'
       - name: run all modules integration test
         run: |
-          ./mvnw -T 1C -B verify -DskipUT=true -DskipIT=false -D"checkstyle.skip"=true -D"scalastyle.skip"=true -D"license.skipAddThirdParty"=true --no-snapshot-updates
+          ./mvnw -T 1C -B verify -DskipUT=true -DskipIT=false -D"scalastyle.skip"=true -D"license.skipAddThirdParty"=true --no-snapshot-updates
         env:
           MAVEN_OPTS: -Xmx2048m
 

@@ -12,19 +12,19 @@ Write data to Apache Cassandra.
 
 ## Options
 
-| name              | type   | required | default value |
-|-------------------|--------|----------|---------------|
-| host              | String | Yes      | -             |
-| keyspace          | String | Yes      | -             |
-| table             | String | Yes      | -             |
-| username          | String | No       | -             |
-| password          | String | No       | -             |
-| datacenter        | String | No       | datacenter1   |
-| consistency_level | String | No       | LOCAL_ONE     |
-| fields            | String | No       | LOCAL_ONE     |
-| batch_size        | String | No       | 5000          |
-| batch_type        | String | No       | UNLOGGER      |
-| async_write       | String | No       | true          |
+|       name        |  type   | required | default value |
+|-------------------|---------|----------|---------------|
+| host              | String  | Yes      | -             |
+| keyspace          | String  | Yes      | -             |
+| table             | String  | Yes      | -             |
+| username          | String  | No       | -             |
+| password          | String  | No       | -             |
+| datacenter        | String  | No       | datacenter1   |
+| consistency_level | String  | No       | LOCAL_ONE     |
+| fields            | String  | No       | LOCAL_ONE     |
+| batch_size        | int     | No       | 5000          |
+| batch_type        | String  | No       | UNLOGGED      |
+| async_write       | boolean | No       | true          |
 
 ### host [string]
 
@@ -57,12 +57,12 @@ The `Cassandra` write consistency level, default is `LOCAL_ONE`.
 
 ### fields [array]
 
-The data field that needs to be output to `Cassandra` , if not configured, it will be automatically adapted 
+The data field that needs to be output to `Cassandra` , if not configured, it will be automatically adapted
 according to the sink table `schema`.
 
 ### batch_size [number]
 
-The number of rows written through [Cassandra-Java-Driver](https://github.com/datastax/java-driver) each time, 
+The number of rows written through [Cassandra-Java-Driver](https://github.com/datastax/java-driver) each time,
 default is `5000`.
 
 ### batch_type [String]
@@ -92,6 +92,4 @@ sink {
 ### next version
 
 - Add Cassandra Sink Connector
-
-
 

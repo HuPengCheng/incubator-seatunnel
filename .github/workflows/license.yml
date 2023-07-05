@@ -41,7 +41,7 @@ jobs:
     name: Auto License
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Have a buggy in https://github.com/apache/incubator-seatunnel/pull/1642, Can trigger when commit message contains
+    # Have a buggy in https://github.com/apache/seatunnel/pull/1642, Can trigger when commit message contains
     # keyword `[ci-auto-license]`.
     if: "contains(toJSON(github.event.commits.*.message), '[ci-auto-license]')"
     env:
@@ -67,7 +67,7 @@ jobs:
             ${{ runner.os }}-maven-
       - name: Generate THIRD-PARTY
         run: |
-          ./mvnw clean license:aggregate-add-third-party -DskipTests -Dcheckstyle.skip -U
+          ./mvnw clean license:aggregate-add-third-party -DskipTests -U
       - name: Check LICENSE file
         run: |
           python3 tools/dependencies/license.py seatunnel-dist/target/THIRD-PARTY.txt seatunnel-dist/release-docs/LICENSE true

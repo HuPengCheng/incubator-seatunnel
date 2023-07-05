@@ -28,9 +28,12 @@ import com.hazelcast.spi.impl.operationservice.Operation;
 public class GetJobMetricsTask extends AbstractSeaTunnelMessageTask<Long, String> {
 
     protected GetJobMetricsTask(ClientMessage clientMessage, Node node, Connection connection) {
-        super(clientMessage, node, connection,
-            SeaTunnelGetJobMetricsCodec::decodeRequest,
-            SeaTunnelGetJobMetricsCodec::encodeResponse);
+        super(
+                clientMessage,
+                node,
+                connection,
+                SeaTunnelGetJobMetricsCodec::decodeRequest,
+                SeaTunnelGetJobMetricsCodec::encodeResponse);
     }
 
     @Override
@@ -40,7 +43,7 @@ public class GetJobMetricsTask extends AbstractSeaTunnelMessageTask<Long, String
 
     @Override
     public String getMethodName() {
-        return "getJobStatus";
+        return "getJobMetrics";
     }
 
     @Override

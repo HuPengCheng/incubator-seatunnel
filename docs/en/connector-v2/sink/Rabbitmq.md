@@ -10,22 +10,24 @@ Used to write data to Rabbitmq.
 
 - [ ] [exactly-once](../../concept/connector-v2-features.md)
 
-##  Options
+## Options
 
-| name                        | type    | required  | default value |
-|-----------------------------|---------|-----------|---------------|
-| host                        | string  | yes       | -             |
-| port                        | int     | yes       | -             |
-| virtual_host                | string  | yes       | -             |
-| username                    | string  | yes       | -             |
-| password                    | string  | yes       | -             |
-| queue_name                  | string  | yes       | -             |
-| url                         | string  | no        | -             |
-| network_recovery_interval   | int     | no        | -             |
-| topology_recovery_enabled   | boolean | no        | -             |
-| automatic_recovery_enabled  | boolean | no        | -             |
-| connection_timeout          | int     | no        | -             |
-| common-options              |         | no        | -             |
+|            name            |  type   | required | default value |
+|----------------------------|---------|----------|---------------|
+| host                       | string  | yes      | -             |
+| port                       | int     | yes      | -             |
+| virtual_host               | string  | yes      | -             |
+| username                   | string  | yes      | -             |
+| password                   | string  | yes      | -             |
+| queue_name                 | string  | yes      | -             |
+| url                        | string  | no       | -             |
+| network_recovery_interval  | int     | no       | -             |
+| topology_recovery_enabled  | boolean | no       | -             |
+| automatic_recovery_enabled | boolean | no       | -             |
+| use_correlation_id         | boolean | no       | false         |
+| connection_timeout         | int     | no       | -             |
+| rabbitmq.config            | map     | no       | -             |
+| common-options             |         | no       | -             |
 
 ### host [string]
 
@@ -65,17 +67,25 @@ the schema fields of upstream data.
 
 how long will automatic recovery wait before attempting to reconnect, in ms
 
-### topology_recovery [string]
+### topology_recovery_enabled [boolean]
 
 if true, enables topology recovery
 
-### automatic_recovery [string]
+### automatic_recovery_enabled [boolean]
 
 if true, enables connection recovery
+
+### use_correlation_id [boolean]
+
+whether the messages received are supplied with a unique id to deduplicate messages (in case of failed acknowledgments).
 
 ### connection_timeout [int]
 
 connection TCP establishment timeout in milliseconds; zero for infinite
+
+### rabbitmq.config [map]
+
+In addition to the above parameters that must be specified by the RabbitMQ client, the user can also specify multiple non-mandatory parameters for the client, covering [all the parameters specified in the official RabbitMQ document](https://www.rabbitmq.com/configure.html).
 
 ### common options
 
@@ -94,6 +104,10 @@ sink {
           username = "guest"
           password = "guest"
           queue_name = "test1"
+          rabbitmq.config = {
+            requested-heartbeat = 10
+            connection-timeout = 10
+          }
       }
 }
 ```
@@ -103,3 +117,5 @@ sink {
 ### next version
 
 - Add Rabbitmq Sink Connector
+- [Improve] Change Connector Custom Config Prefix To Map [3719](https://github.com/apache/seatunnel/pull/3719)
+

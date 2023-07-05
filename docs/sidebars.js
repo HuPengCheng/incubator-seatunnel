@@ -88,7 +88,8 @@ const sidebars = {
             "items": [
                 "concept/config",
                 "concept/connector-v2-features",
-                'concept/schema-feature'
+                'concept/schema-feature',
+                'concept/JobEnvConfig'
             ]
         },
         "Connector-v2-release-state",
@@ -133,7 +134,7 @@ const sidebars = {
                     ]
                 },
                 "connector-v2/Error-Quick-Reference-Manual",
-                "connector-v2/EnvConf"
+                "connector-v2/Config-Encryption-Decryption"
             ]
         },
         {
@@ -170,6 +171,7 @@ const sidebars = {
                 "seatunnel-engine/local-mode",
                 "seatunnel-engine/cluster-mode",
                 "seatunnel-engine/checkpoint-storage",
+                "seatunnel-engine/rest-api",
                 "seatunnel-engine/tcp"
             ]
         },

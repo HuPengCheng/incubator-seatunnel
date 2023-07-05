@@ -12,16 +12,16 @@ Used to read data from Maxcompute.
 
 ## Options
 
-| name              | type     | required  | default value |
-|-------------------|----------|-----------|---------------|
-| accessId          | string   | yes       | -             |
-| accesskey         | string   | yes       | -             |
-| endpoint          | string   | yes       | -             |
-| project           | string   | yes       | -             |
-| table_name        | string   | yes       | -             |
-| partition_spec    | string   | no        | -             |
-| overwrite         | boolean  | no        | false         |
-| common-options    | string   | no        |               |
+|      name      |  type   | required | default value |
+|----------------|---------|----------|---------------|
+| accessId       | string  | yes      | -             |
+| accesskey      | string  | yes      | -             |
+| endpoint       | string  | yes      | -             |
+| project        | string  | yes      | -             |
+| table_name     | string  | yes      | -             |
+| partition_spec | string  | no       | -             |
+| overwrite      | boolean | no       | false         |
+| common-options | string  | no       |               |
 
 ### accessId [string]
 
@@ -51,7 +51,7 @@ Used to read data from Maxcompute.
 
 `overwrite` Whether to overwrite the table or partition, default: false.
 
-### common options 
+### common options
 
 Sink plugin common parameters, please refer to [Sink Common Options](common-options.md) for details.
 
@@ -75,4 +75,5 @@ sink {
 
 ### next version
 
-- [Feature] Add Maxcompute Sink Connector([3640](https://github.com/apache/incubator-seatunnel/pull/3640))
+- [Feature] Add Maxcompute Sink Connector([3640](https://github.com/apache/seatunnel/pull/3640))
+

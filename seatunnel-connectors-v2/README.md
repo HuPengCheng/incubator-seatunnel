@@ -3,7 +3,7 @@
 This article introduces the new interface and the new code structure on account of the newly designed API for Connectors
 in Apache SeaTunnel. This helps developers quickly understand API and transformation layer improvements. On the other
 hand, it can guide contributors how to use the new API to develop new connectors.See
-this [issue](https://github.com/apache/incubator-seatunnel/issues/1608) for details.
+this [issue](https://github.com/apache/seatunnel/issues/1608) for details.
 
 ## **Code Structure**
 
@@ -16,8 +16,6 @@ development at the current stage, and reduces the difficulty of merging.
 - ../`seatunnel-translation`                                          translation layer for the connector-v2
 - ../`seatunnel-transform-v2`                                         transform v2 connector implementation
 - ../seatunnel-e2e/`seatunnel-connector-v2-e2e`                       connector v2 e2e code
-- ../seatunnel-e2e/`seatunnel-flink-connector-v2-e2e`                 Obsolete, replaced by seatunnel-connector-v2-e2e
-- ../seatunnel-e2e/`seatunnel-spark-connector-v2-e2e`                 Obsolete, replaced by seatunnel-connector-v2-e2e
 - ../seatunnel-examples/`seatunnel-flink-connector-v2-example`        seatunnel connector-v2 example use flink local running instance
 - ../seatunnel-examples/`seatunnel-spark-connector-v2-example`        seatunnel connector-v2 example use spark local running instance
 
@@ -219,7 +217,7 @@ It is recommended to put it in the same directory as the implementation class of
     exist one by one in the Config, and use it directly That's it.
     You can refer to existing implementations, such as `org.apache.seatunnel.connectors.seatunnel.elasticsearch.source.ElasticsearchSourceFactory`.
     There is support for configuring Schema for many Sources, so a common Option is used.
-    If you need a schema, you can refer to `org.apache.seatunnel.connectors.seatunnel.common.schema.SeaTunnelSchema.SCHEMA`.
+    If you need a schema, you can refer to `org.apache.seatunnel.api.table.catalog.CatalogTableUtil.SCHEMA`.
 
 Don't forget to add `@AutoService(Factory.class)` to the class. This Factory is the parent class of TableSourceFactory and TableSinkFactory.
 

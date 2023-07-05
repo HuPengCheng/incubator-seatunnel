@@ -24,26 +24,21 @@ import lombok.Getter;
 
 import java.util.Properties;
 
-/**
- * A basic Source configuration which is used by {@link IncrementalSource}.
- */
+/** A basic Source configuration which is used by {@link IncrementalSource}. */
 public abstract class BaseSourceConfig implements SourceConfig {
 
     private static final long serialVersionUID = 1L;
 
-    @Getter
-    protected final StartupConfig startupConfig;
+    @Getter protected final StartupConfig startupConfig;
 
-    @Getter
-    protected final StopConfig stopConfig;
+    @Getter protected final StopConfig stopConfig;
 
-    @Getter
-    protected final int splitSize;
+    @Getter protected final int splitSize;
 
-    @Getter
-    protected final double distributionFactorUpper;
-    @Getter
-    protected final double distributionFactorLower;
+    @Getter protected final double distributionFactorUpper;
+    @Getter protected final double distributionFactorLower;
+    @Getter protected final int sampleShardingThreshold;
+    @Getter protected final int inverseSamplingRate;
 
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
@@ -51,17 +46,21 @@ public abstract class BaseSourceConfig implements SourceConfig {
     protected final Properties dbzProperties;
 
     public BaseSourceConfig(
-        StartupConfig startupConfig,
-        StopConfig stopConfig,
-        int splitSize,
-        double distributionFactorUpper,
-        double distributionFactorLower,
-        Properties dbzProperties) {
+            StartupConfig startupConfig,
+            StopConfig stopConfig,
+            int splitSize,
+            double distributionFactorUpper,
+            double distributionFactorLower,
+            int sampleShardingThreshold,
+            int inverseSamplingRate,
+            Properties dbzProperties) {
         this.startupConfig = startupConfig;
         this.stopConfig = stopConfig;
         this.splitSize = splitSize;
         this.distributionFactorUpper = distributionFactorUpper;
         this.distributionFactorLower = distributionFactorLower;
+        this.sampleShardingThreshold = sampleShardingThreshold;
+        this.inverseSamplingRate = inverseSamplingRate;
         this.dbzProperties = dbzProperties;
     }
 

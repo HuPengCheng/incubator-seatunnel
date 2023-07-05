@@ -17,6 +17,7 @@
 
 package org.apache.seatunnel.engine.server.task.context;
 
+import org.apache.seatunnel.api.common.metrics.MetricsContext;
 import org.apache.seatunnel.api.source.SourceEvent;
 import org.apache.seatunnel.api.source.SourceSplit;
 import org.apache.seatunnel.api.source.SourceSplitEnumerator;
@@ -24,20 +25,30 @@ import org.apache.seatunnel.common.utils.SerializationUtils;
 import org.apache.seatunnel.engine.server.task.SourceSplitEnumeratorTask;
 import org.apache.seatunnel.engine.server.task.operation.source.AssignSplitOperation;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-public class SeaTunnelSplitEnumeratorContext<SplitT extends SourceSplit> implements SourceSplitEnumerator.Context<SplitT> {
+@Slf4j
+public class SeaTunnelSplitEnumeratorContext<SplitT extends SourceSplit>
+        implements SourceSplitEnumerator.Context<SplitT> {
 
     private final int parallelism;
 
     private final SourceSplitEnumeratorTask<SplitT> task;
 
-    public SeaTunnelSplitEnumeratorContext(int parallelism, SourceSplitEnumeratorTask<SplitT> task) {
+    private final MetricsContext metricsContext;
+
+    public SeaTunnelSplitEnumeratorContext(
+            int parallelism,
+            SourceSplitEnumeratorTask<SplitT> task,
+            MetricsContext metricsContext) {
         this.parallelism = parallelism;
         this.task = task;
+        this.metricsContext = metricsContext;
     }
 
     @Override
@@ -52,19 +63,35 @@ public class SeaTunnelSplitEnumeratorContext<SplitT extends SourceSplit> impleme
 
     @Override
     public void assignSplit(int subtaskIndex, List<SplitT> splits) {
-        task.getExecutionContext().sendToMember(new AssignSplitOperation<>(task.getTaskMemberLocationByIndex(subtaskIndex),
-            SerializationUtils.serialize(splits.toArray())), task.getTaskMemberAddressByIndex(subtaskIndex));
+        if (registeredReaders().isEmpty()) {
+            log.warn("No reader is obtained, skip this assign!");
+            return;
+        }
+        task.getExecutionContext()
+                .sendToMember(
+                        new AssignSplitOperation<>(
+                                task.getTaskMemberLocationByIndex(subtaskIndex),
+                                SerializationUtils.serialize(splits.toArray())),
+                        task.getTaskMemberAddressByIndex(subtaskIndex))
+                .join();
     }
 
     @Override
     public void signalNoMoreSplits(int subtaskIndex) {
-        task.getExecutionContext().sendToMember(
-            new AssignSplitOperation<>(task.getTaskMemberLocationByIndex(subtaskIndex), SerializationUtils.serialize(Collections.emptyList().toArray())),
-            task.getTaskMemberAddressByIndex(subtaskIndex));
+        task.getExecutionContext()
+                .sendToMember(
+                        new AssignSplitOperation<>(
+                                task.getTaskMemberLocationByIndex(subtaskIndex),
+                                SerializationUtils.serialize(Collections.emptyList().toArray())),
+                        task.getTaskMemberAddressByIndex(subtaskIndex))
+                .join();
     }
 
     @Override
-    public void sendEventToSourceReader(int subtaskId, SourceEvent event) {
+    public void sendEventToSourceReader(int subtaskId, SourceEvent event) {}
 
+    @Override
+    public MetricsContext getMetricsContext() {
+        return metricsContext;
     }
 }

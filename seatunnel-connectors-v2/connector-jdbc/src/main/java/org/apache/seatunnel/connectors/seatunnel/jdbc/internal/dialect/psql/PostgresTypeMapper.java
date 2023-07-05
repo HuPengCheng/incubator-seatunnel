@@ -84,10 +84,13 @@ public class PostgresTypeMapper implements JdbcDialectTypeMapper {
     private static final String PG_CHARACTER_ARRAY = "_character";
     private static final String PG_CHARACTER_VARYING = "varchar";
     private static final String PG_CHARACTER_VARYING_ARRAY = "_varchar";
+    private static final String PG_GEOMETRY = "geometry";
+    private static final String PG_GEOGRAPHY = "geography";
 
     @SuppressWarnings("checkstyle:MagicNumber")
     @Override
-    public SeaTunnelDataType<?> mapping(ResultSetMetaData metadata, int colIndex) throws SQLException {
+    public SeaTunnelDataType<?> mapping(ResultSetMetaData metadata, int colIndex)
+            throws SQLException {
 
         String pgType = metadata.getColumnTypeName(colIndex);
 
@@ -134,6 +137,8 @@ public class PostgresTypeMapper implements JdbcDialectTypeMapper {
             case PG_CHARACTER:
             case PG_CHARACTER_VARYING:
             case PG_TEXT:
+            case PG_GEOMETRY:
+            case PG_GEOGRAPHY:
                 return BasicType.STRING_TYPE;
             case PG_CHAR_ARRAY:
             case PG_CHARACTER_ARRAY:
@@ -154,8 +159,9 @@ public class PostgresTypeMapper implements JdbcDialectTypeMapper {
             case PG_TIME_ARRAY:
             case PG_DATE_ARRAY:
             default:
-                throw new JdbcConnectorException(CommonErrorCode.UNSUPPORTED_OPERATION,
-                    String.format("Doesn't support Postgres type '%s' yet", pgType));
+                throw new JdbcConnectorException(
+                        CommonErrorCode.UNSUPPORTED_OPERATION,
+                        String.format("Doesn't support Postgres type '%s' yet", pgType));
         }
     }
 }

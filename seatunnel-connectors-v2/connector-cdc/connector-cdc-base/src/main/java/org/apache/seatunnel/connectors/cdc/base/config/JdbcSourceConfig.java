@@ -34,6 +34,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
     protected final int port;
     protected final String username;
     protected final String password;
+    protected final String originUrl;
     protected final List<String> databaseList;
     protected final List<String> tableList;
     protected final int fetchSize;
@@ -50,12 +51,15 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
             int splitSize,
             double distributionFactorUpper,
             double distributionFactorLower,
+            int sampleShardingThreshold,
+            int inverseSamplingRate,
             Properties dbzProperties,
             String driverClassName,
             String hostname,
             int port,
             String username,
             String password,
+            String originUrl,
             int fetchSize,
             String serverTimeZone,
             long connectTimeoutMillis,
@@ -67,12 +71,15 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
                 splitSize,
                 distributionFactorUpper,
                 distributionFactorLower,
+                sampleShardingThreshold,
+                inverseSamplingRate,
                 dbzProperties);
         this.driverClassName = driverClassName;
         this.hostname = hostname;
         this.port = port;
         this.username = username;
         this.password = password;
+        this.originUrl = originUrl;
         this.databaseList = databaseList;
         this.tableList = tableList;
         this.fetchSize = fetchSize;
@@ -98,6 +105,10 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
 
     public String getUsername() {
         return username;
+    }
+
+    public String getOriginUrl() {
+        return originUrl;
     }
 
     public String getPassword() {
