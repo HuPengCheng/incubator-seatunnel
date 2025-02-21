@@ -110,8 +110,8 @@ public class JdbcSinkCDCChangelogIT extends TestSuiteBase implements TestResourc
                         postgreSQLContainer.getJdbcUrl(),
                         postgreSQLContainer.getUsername(),
                         postgreSQLContainer.getPassword())) {
-            try (Statement statement = connection.createStatement()) {
-                ResultSet resultSet = statement.executeQuery("select * from sink");
+            try (Statement statement = connection.createStatement();
+                    ResultSet resultSet = statement.executeQuery("select * from sink")) {
                 while (resultSet.next()) {
                     List<Object> row =
                             Arrays.asList(
@@ -126,6 +126,16 @@ public class JdbcSinkCDCChangelogIT extends TestSuiteBase implements TestResourc
                 Stream.<List<Object>>of(Arrays.asList(1L, "A_1", 100), Arrays.asList(3L, "C", 100))
                         .collect(Collectors.toSet());
         Assertions.assertIterableEquals(expected, actual);
+        try (Connection connection =
+                DriverManager.getConnection(
+                        postgreSQLContainer.getJdbcUrl(),
+                        postgreSQLContainer.getUsername(),
+                        postgreSQLContainer.getPassword())) {
+            try (Statement statement = connection.createStatement()) {
+                statement.execute("truncate table sink");
+                log.info("testSinkCDCChangelog truncate table sink");
+            }
+        }
     }
 
     private void initializeJdbcTable() {

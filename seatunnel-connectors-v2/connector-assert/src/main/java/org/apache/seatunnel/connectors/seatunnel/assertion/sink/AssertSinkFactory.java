@@ -18,12 +18,15 @@
 package org.apache.seatunnel.connectors.seatunnel.assertion.sink;
 
 import org.apache.seatunnel.api.configuration.util.OptionRule;
+import org.apache.seatunnel.api.table.connector.TableSink;
 import org.apache.seatunnel.api.table.factory.Factory;
 import org.apache.seatunnel.api.table.factory.TableSinkFactory;
+import org.apache.seatunnel.api.table.factory.TableSinkFactoryContext;
 
 import com.google.auto.service.AutoService;
 
-import static org.apache.seatunnel.connectors.seatunnel.assertion.sink.AssertConfig.RULES;
+import static org.apache.seatunnel.connectors.seatunnel.assertion.sink.AssertSinkOptions.MULTI_TABLE_SINK_REPLICA;
+import static org.apache.seatunnel.connectors.seatunnel.assertion.sink.AssertSinkOptions.RULES;
 
 @AutoService(Factory.class)
 public class AssertSinkFactory implements TableSinkFactory {
@@ -35,6 +38,11 @@ public class AssertSinkFactory implements TableSinkFactory {
 
     @Override
     public OptionRule optionRule() {
-        return OptionRule.builder().required(RULES).build();
+        return OptionRule.builder().required(RULES).optional(MULTI_TABLE_SINK_REPLICA).build();
+    }
+
+    @Override
+    public TableSink createSink(TableSinkFactoryContext context) {
+        return () -> new AssertSink(context.getOptions(), context.getCatalogTable());
     }
 }

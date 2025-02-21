@@ -17,18 +17,17 @@
 
 package org.apache.seatunnel.connectors.seatunnel.influxdb.config;
 
+import org.apache.seatunnel.shade.com.google.common.annotations.VisibleForTesting;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
 import org.apache.seatunnel.api.configuration.Option;
 import org.apache.seatunnel.api.configuration.Options;
 
-import com.google.common.annotations.VisibleForTesting;
 import lombok.Data;
 
 import java.io.Serializable;
 
 @Data
-@SuppressWarnings("checkstyle:MagicNumber")
 public class InfluxDBConfig implements Serializable {
 
     public static final Option<String> USERNAME =

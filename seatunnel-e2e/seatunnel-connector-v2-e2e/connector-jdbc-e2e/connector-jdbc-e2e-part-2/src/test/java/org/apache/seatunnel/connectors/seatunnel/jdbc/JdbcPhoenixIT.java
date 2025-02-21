@@ -17,6 +17,8 @@
 
 package org.apache.seatunnel.connectors.seatunnel.jdbc;
 
+import org.apache.seatunnel.shade.com.google.common.collect.Lists;
+
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.common.exception.SeaTunnelRuntimeException;
 
@@ -26,8 +28,6 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.utility.DockerLoggerFactory;
-
-import com.google.common.collect.Lists;
 
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -110,17 +110,20 @@ public class JdbcPhoenixIT extends AbstractJdbcIT {
                     String.format(
                             "delete from %s where 1=1", buildTableInfoWithSchema(schema, table));
             statement.execute(truncate);
+            connection.commit();
         } catch (SQLException e) {
+            try {
+                connection.rollback();
+            } catch (SQLException exception) {
+                throw new SeaTunnelRuntimeException(JdbcITErrorCode.CLEAR_TABLE_FAILED, exception);
+            }
             throw new SeaTunnelRuntimeException(JdbcITErrorCode.CLEAR_TABLE_FAILED, e);
         }
     }
 
     @Override
-    void compareResult() {}
-
-    @Override
     String driverUrl() {
-        return "https://maven.aliyun.com/repository/public/com/aliyun/phoenix/ali-phoenix-shaded-thin-client/5.2.5-HBase-2.x/ali-phoenix-shaded-thin-client-5.2.5-HBase-2.x.jar";
+        return "https://repo1.maven.org/maven2/com/aliyun/phoenix/ali-phoenix-shaded-thin-client/5.2.5-HBase-2.x/ali-phoenix-shaded-thin-client-5.2.5-HBase-2.x.jar";
     }
 
     @Override

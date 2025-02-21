@@ -17,26 +17,50 @@
 
 package org.apache.seatunnel.api.table.catalog;
 
+import org.apache.commons.lang3.StringUtils;
+
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+import lombok.NonNull;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @EqualsAndHashCode
-@RequiredArgsConstructor
 public final class TablePath implements Serializable {
     private static final long serialVersionUID = 1L;
     private final String databaseName;
     private final String schemaName;
-    private final String tableName;
+    @NonNull private final String tableName;
+
+    public TablePath(String databaseName, String schemaName, @NonNull String tableName) {
+        this.databaseName = databaseName;
+        this.schemaName = schemaName;
+        this.tableName = tableName;
+        if (StringUtils.isEmpty(tableName)) {
+            throw new IllegalArgumentException("tableName cannot be empty");
+        }
+    }
+
+    public static final TablePath DEFAULT = TablePath.of("default", "default", "default");
 
     public static TablePath of(String fullName) {
+        return of(fullName, false);
+    }
+
+    public static TablePath of(String fullName, boolean schemaFirst) {
         String[] paths = fullName.split("\\.");
 
+        if (paths.length == 1) {
+            return of(null, paths[0]);
+        }
         if (paths.length == 2) {
-            return of(paths[0], paths[1]);
+            if (schemaFirst) {
+                return of(null, paths[0], paths[1]);
+            }
+            return of(paths[0], null, paths[1]);
         }
         if (paths.length == 3) {
             return of(paths[0], paths[1], paths[2]);
@@ -54,14 +78,15 @@ public final class TablePath implements Serializable {
     }
 
     public String getSchemaAndTableName() {
-        return String.format("%s.%s", schemaName, tableName);
+        return getNameCommon(null, schemaName, tableName, null, null);
+    }
+
+    public String getSchemaAndTableName(String quote) {
+        return getNameCommon(null, schemaName, tableName, quote, quote);
     }
 
     public String getFullName() {
-        if (schemaName == null) {
-            return String.format("%s.%s", databaseName, tableName);
-        }
-        return String.format("%s.%s.%s", databaseName, schemaName, tableName);
+        return getNameCommon(databaseName, schemaName, tableName, null, null);
     }
 
     public String getFullNameWithQuoted() {
@@ -69,13 +94,36 @@ public final class TablePath implements Serializable {
     }
 
     public String getFullNameWithQuoted(String quote) {
-        if (schemaName == null) {
-            return String.format(
-                    "%s%s%s.%s%s%s", quote, databaseName, quote, quote, tableName, quote);
+        return getNameCommon(databaseName, schemaName, tableName, quote, quote);
+    }
+
+    public String getFullNameWithQuoted(String quoteLeft, String quoteRight) {
+        return getNameCommon(databaseName, schemaName, tableName, quoteLeft, quoteRight);
+    }
+
+    private String getNameCommon(
+            String databaseName,
+            String schemaName,
+            String tableName,
+            String quoteLeft,
+            String quoteRight) {
+        List<String> joinList = new ArrayList<>();
+        quoteLeft = quoteLeft == null ? "" : quoteLeft;
+        quoteRight = quoteRight == null ? "" : quoteRight;
+
+        if (databaseName != null) {
+            joinList.add(quoteLeft + databaseName + quoteRight);
         }
-        return String.format(
-                "%s%s%s.%s%s%s.%s%s%s",
-                quote, databaseName, quote, quote, schemaName, quote, quote, tableName, quote);
+
+        if (schemaName != null) {
+            joinList.add(quoteLeft + schemaName + quoteRight);
+        }
+
+        if (tableName != null) {
+            joinList.add(quoteLeft + tableName + quoteRight);
+        }
+
+        return String.join(".", joinList);
     }
 
     @Override

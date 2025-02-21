@@ -22,6 +22,7 @@ import org.apache.seatunnel.connectors.cdc.base.source.IncrementalSource;
 import io.debezium.config.Configuration;
 import lombok.Getter;
 
+import java.util.Map;
 import java.util.Properties;
 
 /** A basic Source configuration which is used by {@link IncrementalSource}. */
@@ -34,11 +35,13 @@ public abstract class BaseSourceConfig implements SourceConfig {
     @Getter protected final StopConfig stopConfig;
 
     @Getter protected final int splitSize;
+    @Getter protected final Map<String, String> splitColumn;
 
     @Getter protected final double distributionFactorUpper;
     @Getter protected final double distributionFactorLower;
     @Getter protected final int sampleShardingThreshold;
     @Getter protected final int inverseSamplingRate;
+    @Getter protected final boolean exactlyOnce;
 
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
@@ -49,18 +52,22 @@ public abstract class BaseSourceConfig implements SourceConfig {
             StartupConfig startupConfig,
             StopConfig stopConfig,
             int splitSize,
+            Map<String, String> splitColumn,
             double distributionFactorUpper,
             double distributionFactorLower,
             int sampleShardingThreshold,
             int inverseSamplingRate,
+            boolean exactlyOnce,
             Properties dbzProperties) {
         this.startupConfig = startupConfig;
         this.stopConfig = stopConfig;
         this.splitSize = splitSize;
+        this.splitColumn = splitColumn;
         this.distributionFactorUpper = distributionFactorUpper;
         this.distributionFactorLower = distributionFactorLower;
         this.sampleShardingThreshold = sampleShardingThreshold;
         this.inverseSamplingRate = inverseSamplingRate;
+        this.exactlyOnce = exactlyOnce;
         this.dbzProperties = dbzProperties;
     }
 

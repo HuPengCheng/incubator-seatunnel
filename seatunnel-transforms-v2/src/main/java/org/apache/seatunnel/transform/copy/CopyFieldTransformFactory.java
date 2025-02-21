@@ -18,14 +18,13 @@
 package org.apache.seatunnel.transform.copy;
 
 import org.apache.seatunnel.api.configuration.util.OptionRule;
-import org.apache.seatunnel.api.table.catalog.CatalogTable;
 import org.apache.seatunnel.api.table.connector.TableTransform;
 import org.apache.seatunnel.api.table.factory.Factory;
-import org.apache.seatunnel.api.table.factory.TableFactoryContext;
 import org.apache.seatunnel.api.table.factory.TableTransformFactory;
+import org.apache.seatunnel.api.table.factory.TableTransformFactoryContext;
+import org.apache.seatunnel.transform.common.TransformCommonOptions;
 
 import com.google.auto.service.AutoService;
-import lombok.NonNull;
 
 @AutoService(Factory.class)
 public class CopyFieldTransformFactory implements TableTransformFactory {
@@ -39,13 +38,15 @@ public class CopyFieldTransformFactory implements TableTransformFactory {
         return OptionRule.builder()
                 .bundled(CopyTransformConfig.SRC_FIELD, CopyTransformConfig.DEST_FIELD)
                 .bundled(CopyTransformConfig.FIELDS)
+                .optional(TransformCommonOptions.MULTI_TABLES)
+                .optional(TransformCommonOptions.TABLE_MATCH_REGEX)
                 .build();
     }
 
     @Override
-    public TableTransform createTransform(@NonNull TableFactoryContext context) {
-        CopyTransformConfig copyTransformConfig = CopyTransformConfig.of(context.getOptions());
-        CatalogTable catalogTable = context.getCatalogTable();
-        return () -> new CopyFieldTransform(copyTransformConfig, catalogTable);
+    public TableTransform createTransform(TableTransformFactoryContext context) {
+        return () ->
+                new CopyFieldMultiCatalogTransform(
+                        context.getCatalogTables(), context.getOptions());
     }
 }

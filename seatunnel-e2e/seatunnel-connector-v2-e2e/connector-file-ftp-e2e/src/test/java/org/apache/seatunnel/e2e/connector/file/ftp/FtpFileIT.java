@@ -21,8 +21,11 @@ import org.apache.seatunnel.e2e.common.TestResource;
 import org.apache.seatunnel.e2e.common.TestSuiteBase;
 import org.apache.seatunnel.e2e.common.container.EngineType;
 import org.apache.seatunnel.e2e.common.container.TestContainer;
+import org.apache.seatunnel.e2e.common.container.TestHelper;
 import org.apache.seatunnel.e2e.common.junit.DisabledOnContainer;
 import org.apache.seatunnel.e2e.common.util.ContainerUtil;
+
+import org.apache.commons.lang3.StringUtils;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -31,14 +34,25 @@ import org.junit.jupiter.api.TestTemplate;
 import org.testcontainers.containers.Container;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.lifecycle.Startables;
-import org.testcontainers.utility.MountableFile;
+import org.testcontainers.shaded.com.github.dockerjava.core.command.ExecStartResultCallback;
 
+import com.github.dockerjava.api.command.ExecCreateCmdResponse;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.file.Path;
+import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
+import java.util.Properties;
+import java.util.function.BiFunction;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 @DisabledOnContainer(
@@ -61,14 +75,29 @@ public class FtpFileIT extends TestSuiteBase implements TestResource {
 
     private GenericContainer<?> ftpContainer;
 
+    private String ftpPassiveAddress;
+
+    private BiFunction<Integer, Integer, Integer[]> generateExposedPorts =
+            (startPort, endPort) ->
+                    IntStream.rangeClosed(startPort, endPort).boxed().toArray(Integer[]::new);
+
+    private BiFunction<Integer, Integer, List<String>> generatePortBindings =
+            (startPort, endPort) ->
+                    IntStream.rangeClosed(startPort, endPort)
+                            .mapToObj(i -> i + ":" + i)
+                            .collect(Collectors.toList());
+
     @BeforeAll
     @Override
     public void startUp() throws Exception {
+        int passiveStartPort = 30000;
+        int passiveEndPort = 30004;
         ftpContainer =
                 new GenericContainer<>(FTP_IMAGE)
-                        .withExposedPorts(FTP_PORT)
                         .withNetwork(NETWORK)
                         .withExposedPorts(FTP_PORT)
+                        .withExposedPorts(
+                                generateExposedPorts.apply(passiveStartPort, passiveEndPort))
                         .withNetworkAliases(ftp_CONTAINER_HOST)
                         .withEnv("FILE_OPEN_MODE", "0666")
                         .withEnv("WRITE_ENABLE", "YES")
@@ -78,80 +107,234 @@ public class FtpFileIT extends TestSuiteBase implements TestResource {
                         .withEnv("LOCAL_UMASK", "000")
                         .withEnv("FTP_USER", USERNAME)
                         .withEnv("FTP_PASS", PASSWORD)
-                        .withEnv("PASV_ADDRESS", "0.0.0.0")
+                        .withEnv("PASV_MIN_PORT", String.valueOf(passiveStartPort))
+                        .withEnv("PASV_MAX_PORT", String.valueOf(passiveEndPort))
                         .withLogConsumer(new Slf4jLogConsumer(log))
+                        // Modify the strategy mode because the passive mode port does not need to
+                        // be checked here, it does not start with the FTP startup.
+                        .waitingFor(Wait.forLogMessage(".*", 1))
                         .withPrivilegedMode(true);
 
-        ftpContainer.setPortBindings(Collections.singletonList("21:21"));
+        List<String> portBind = new ArrayList<>();
+        portBind.add("21:21");
+        portBind.addAll(generatePortBindings.apply(passiveStartPort, passiveEndPort));
+
+        ftpContainer.setPortBindings(portBind);
         ftpContainer.start();
         Startables.deepStart(Stream.of(ftpContainer)).join();
+
+        // Get the passive mode address of the FTP container
+        Properties properties = new Properties();
+        properties.load(
+                new StringReader(
+                        ftpContainer
+                                .execInContainer("sh", "-c", "cat /etc/vsftpd/vsftpd.conf")
+                                .getStdout()));
+        ftpPassiveAddress = properties.getProperty("pasv_address");
+
         log.info("ftp container started");
 
-        Path jsonPath = ContainerUtil.getResourcesFile("/json/e2e.json").toPath();
-        Path textPath = ContainerUtil.getResourcesFile("/text/e2e.txt").toPath();
-        Path excelPath = ContainerUtil.getResourcesFile("/excel/e2e.xlsx").toPath();
+        ContainerUtil.copyFileIntoContainers(
+                "/json/e2e.json",
+                "/home/vsftpd/seatunnel/tmp/seatunnel/read/json/name=tyrantlucifer/hobby=coding/e2e.json",
+                ftpContainer);
 
-        ftpContainer.copyFileToContainer(
-                MountableFile.forHostPath(jsonPath),
-                "/home/vsftpd/seatunnel/tmp/seatunnel/read/json/name=tyrantlucifer/hobby=coding/e2e.json");
-        ftpContainer.copyFileToContainer(
-                MountableFile.forHostPath(textPath),
-                "/home/vsftpd/seatunnel/tmp/seatunnel/read/text/name=tyrantlucifer/hobby=coding/e2e.txt");
-        ftpContainer.copyFileToContainer(
-                MountableFile.forHostPath(excelPath),
-                "/home/vsftpd/seatunnel/tmp/seatunnel/read/excel/name=tyrantlucifer/hobby=coding/e2e.xlsx");
+        ContainerUtil.copyFileIntoContainers(
+                "/text/e2e.txt",
+                "/home/vsftpd/seatunnel/tmp/seatunnel/read/text/name=tyrantlucifer/hobby=coding/e2e.txt",
+                ftpContainer);
+
+        ContainerUtil.copyFileIntoContainers(
+                "/text/e2e-txt.zip",
+                "/home/vsftpd/seatunnel/tmp/seatunnel/read/zip/txt/single/e2e-txt.zip",
+                ftpContainer);
+
+        ContainerUtil.copyFileIntoContainers(
+                "/excel/e2e.xlsx",
+                "/home/vsftpd/seatunnel/tmp/seatunnel/read/excel/name=tyrantlucifer/hobby=coding/e2e.xlsx",
+                ftpContainer);
+
+        ContainerUtil.copyFileIntoContainers(
+                "/excel/e2e.xlsx",
+                "/home/vsftpd/seatunnel/tmp/seatunnel/read/excel_filter/name=tyrantlucifer/hobby=coding/e2e_filter.xlsx",
+                ftpContainer);
+
+        ContainerUtil.copyFileIntoContainers(
+                "/excel/e2e.xlsx", "/home/vsftpd/seatunnel/e2e.xlsx", ftpContainer);
+
         ftpContainer.execInContainer("sh", "-c", "chmod -R 777 /home/vsftpd/seatunnel/");
         ftpContainer.execInContainer("sh", "-c", "chown -R ftp:ftp /home/vsftpd/seatunnel/");
     }
 
     @TestTemplate
+    public void testFtpFileReadAndWriteForPassive(TestContainer container)
+            throws IOException, InterruptedException {
+        List<String> configParams = Collections.singletonList("ftpHost=" + ftpPassiveAddress);
+        // Test passive mode
+        assertJobExecution(
+                container, "/text/ftp_file_text_to_assert_for_passive.conf", configParams);
+        assertJobExecution(container, "/text/fake_to_ftp_file_text_for_passive.conf", configParams);
+
+        String homePath = "/home/vsftpd/seatunnel/tmp/seatunnel/passive_text";
+        // test write ftp text file
+        Assertions.assertEquals(1, getFileListFromContainer(homePath).size());
+
+        // Confirm data is written correctly
+        Container.ExecResult execResult =
+                ftpContainer.execInContainer("sh", "-c", "awk 'END {print NR}' " + homePath + "/*");
+        Assertions.assertEquals("15", execResult.getStdout().trim());
+
+        deleteFileFromContainer(homePath);
+    }
+
+    @TestTemplate
+    public void testFtpToFtpForBinary(TestContainer container)
+            throws IOException, InterruptedException {
+
+        Container.ExecResult execResult = container.executeJob("/text/ftp_to_ftp_for_binary.conf");
+        Assertions.assertEquals(0, execResult.getExitCode(), execResult.getStderr());
+
+        String homePath = "/home/vsftpd/seatunnel/uploads/seatunnel";
+        Assertions.assertEquals(1, getFileListFromContainer(homePath).size());
+
+        // Confirm data is written correctly
+        Container.ExecResult resultExecResult =
+                ftpContainer.execInContainer(
+                        "sh", "-c", "awk 'END {print NR}' " + homePath + "/e2e.txt");
+        Assertions.assertEquals("5", resultExecResult.getStdout().trim());
+
+        deleteFileFromContainer(homePath);
+    }
+
+    private void assertJobExecution(TestContainer container, String configPath, List<String> params)
+            throws IOException, InterruptedException {
+        Container.ExecResult execResult = container.executeJob(configPath, params);
+        Assertions.assertEquals(0, execResult.getExitCode(), execResult.getStderr());
+    }
+
+    @TestTemplate
     public void testFtpFileReadAndWrite(TestContainer container)
             throws IOException, InterruptedException {
+        TestHelper helper = new TestHelper(container);
         // test write ftp excel file
-        Container.ExecResult excelWriteResult =
-                container.executeJob("/excel/fake_source_to_ftp_excel.conf");
-        Assertions.assertEquals(0, excelWriteResult.getExitCode(), excelWriteResult.getStderr());
+        helper.execute("/excel/fake_source_to_ftp_excel.conf");
         // test read ftp excel file
-        Container.ExecResult excelReadResult =
-                container.executeJob("/excel/ftp_excel_to_assert.conf");
-        Assertions.assertEquals(0, excelReadResult.getExitCode(), excelReadResult.getStderr());
+        helper.execute("/excel/ftp_excel_to_assert.conf");
         // test read ftp excel file with projection
-        Container.ExecResult excelProjectionReadResult =
-                container.executeJob("/excel/ftp_excel_projection_to_assert.conf");
-        Assertions.assertEquals(
-                0, excelProjectionReadResult.getExitCode(), excelProjectionReadResult.getStderr());
+        helper.execute("/excel/ftp_excel_projection_to_assert.conf");
+        // test read ftp excel file with filter
+        helper.execute("/excel/ftp_filter_excel_to_assert.conf");
         // test write ftp text file
-        Container.ExecResult textWriteResult =
-                container.executeJob("/text/fake_to_ftp_file_text.conf");
-        Assertions.assertEquals(0, textWriteResult.getExitCode());
+        helper.execute("/text/fake_to_ftp_file_text.conf");
         // test read skip header
-        Container.ExecResult textWriteAndSkipResult =
-                container.executeJob("/text/ftp_file_text_skip_headers.conf");
-        Assertions.assertEquals(0, textWriteAndSkipResult.getExitCode());
+        helper.execute("/text/ftp_file_text_skip_headers.conf");
         // test read ftp text file
-        Container.ExecResult textReadResult =
-                container.executeJob("/text/ftp_file_text_to_assert.conf");
-        Assertions.assertEquals(0, textReadResult.getExitCode());
+        helper.execute("/text/ftp_file_text_to_assert.conf");
         // test read ftp text file with projection
-        Container.ExecResult textProjectionResult =
-                container.executeJob("/text/ftp_file_text_projection_to_assert.conf");
-        Assertions.assertEquals(0, textProjectionResult.getExitCode());
+        helper.execute("/text/ftp_file_text_projection_to_assert.conf");
+        // test read ftp zip text file
+        helper.execute("/text/ftp_file_zip_text_to_assert.conf");
         // test write ftp json file
-        Container.ExecResult jsonWriteResult =
-                container.executeJob("/json/fake_to_ftp_file_json.conf");
-        Assertions.assertEquals(0, jsonWriteResult.getExitCode());
+        helper.execute("/json/fake_to_ftp_file_json.conf");
         // test read ftp json file
-        Container.ExecResult jsonReadResult =
-                container.executeJob("/json/ftp_file_json_to_assert.conf");
-        Assertions.assertEquals(0, jsonReadResult.getExitCode());
+        helper.execute("/json/ftp_file_json_to_assert.conf");
         // test write ftp parquet file
-        Container.ExecResult parquetWriteResult =
-                container.executeJob("/parquet/fake_to_ftp_file_parquet.conf");
-        Assertions.assertEquals(0, parquetWriteResult.getExitCode());
+        helper.execute("/parquet/fake_to_ftp_file_parquet.conf");
         // test write ftp orc file
-        Container.ExecResult orcWriteResult =
-                container.executeJob("/orc/fake_to_ftp_file_orc.conf");
-        Assertions.assertEquals(0, orcWriteResult.getExitCode());
+        helper.execute("/orc/fake_to_ftp_file_orc.conf");
+        // test write ftp root path excel file
+        helper.execute("/excel/fake_source_to_ftp_root_path_excel.conf");
+        // test ftp source support multipleTable
+
+        String homePath = "/home/vsftpd/seatunnel";
+        String sink01 = "/tmp/seatunnel/json/sink/multiplesource/fake01";
+        String sink02 = "/tmp/seatunnel/json/sink/multiplesource/fake02";
+        deleteFileFromContainer(homePath + sink01);
+        deleteFileFromContainer(homePath + sink02);
+        helper.execute("/json/ftp_file_json_to_assert_with_multipletable.conf");
+        Assertions.assertEquals(getFileListFromContainer(homePath + sink01).size(), 1);
+        Assertions.assertEquals(getFileListFromContainer(homePath + sink02).size(), 1);
+    }
+
+    @TestTemplate
+    public void testMultipleTableAndSaveMode(TestContainer container)
+            throws IOException, InterruptedException {
+        TestHelper helper = new TestHelper(container);
+        // test mult table and save_mode:RECREATE_SCHEMA DROP_DATA
+        String homePath = "/home/vsftpd/seatunnel";
+        String path1 = "/tmp/seatunnel_mult/text/source_1";
+        String path2 = "/tmp/seatunnel_mult/text/source_2";
+        deleteFileFromContainer(homePath + path1);
+        deleteFileFromContainer(homePath + path2);
+        Assertions.assertEquals(getFileListFromContainer(homePath + path1).size(), 0);
+        Assertions.assertEquals(getFileListFromContainer(homePath + path2).size(), 0);
+        helper.execute("/text/multiple_table_fake_to_ftp_file_text.conf");
+        Assertions.assertEquals(getFileListFromContainer(homePath + path1).size(), 1);
+        Assertions.assertEquals(getFileListFromContainer(homePath + path2).size(), 1);
+        helper.execute("/text/multiple_table_fake_to_ftp_file_text.conf");
+        Assertions.assertEquals(getFileListFromContainer(homePath + path1).size(), 1);
+        Assertions.assertEquals(getFileListFromContainer(homePath + path2).size(), 1);
+        // test mult table and save_mode:CREATE_SCHEMA_WHEN_NOT_EXIST APPEND_DATA
+        String path3 = "/tmp/seatunnel_mult2/text/source_1";
+        String path4 = "/tmp/seatunnel_mult2/text/source_2";
+        deleteFileFromContainer(homePath + path3);
+        deleteFileFromContainer(homePath + path4);
+        Assertions.assertEquals(getFileListFromContainer(homePath + path3).size(), 0);
+        Assertions.assertEquals(getFileListFromContainer(homePath + path4).size(), 0);
+        helper.execute("/text/multiple_table_fake_to_ftp_file_text_2.conf");
+        Assertions.assertEquals(getFileListFromContainer(homePath + path3).size(), 1);
+        Assertions.assertEquals(getFileListFromContainer(homePath + path4).size(), 1);
+        helper.execute("/text/multiple_table_fake_to_ftp_file_text_2.conf");
+        Assertions.assertEquals(getFileListFromContainer(homePath + path3).size(), 2);
+        Assertions.assertEquals(getFileListFromContainer(homePath + path4).size(), 2);
+    }
+
+    @SneakyThrows
+    private List<String> getFileListFromContainer(String path) {
+        String command = "ls -1 " + path;
+        ExecCreateCmdResponse execCreateCmdResponse =
+                dockerClient
+                        .execCreateCmd(ftpContainer.getContainerId())
+                        .withCmd("sh", "-c", command)
+                        .withAttachStdout(true)
+                        .withAttachStderr(true)
+                        .exec();
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        dockerClient
+                .execStartCmd(execCreateCmdResponse.getId())
+                .exec(new ExecStartResultCallback(outputStream, System.err))
+                .awaitCompletion();
+
+        String output = new String(outputStream.toByteArray(), StandardCharsets.UTF_8).trim();
+        List<String> fileList = new ArrayList<>();
+        log.info("container path file list is :{}", output);
+        String[] files = output.split("\n");
+        for (String file : files) {
+            if (StringUtils.isNotEmpty(file)) {
+                log.info("container path file name is :{}", file);
+                fileList.add(file);
+            }
+        }
+        return fileList;
+    }
+
+    @SneakyThrows
+    private void deleteFileFromContainer(String path) {
+        String command = "rm -rf " + path;
+        ExecCreateCmdResponse execCreateCmdResponse =
+                dockerClient
+                        .execCreateCmd(ftpContainer.getContainerId())
+                        .withCmd("sh", "-c", command)
+                        .withAttachStdout(true)
+                        .withAttachStderr(true)
+                        .exec();
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        dockerClient
+                .execStartCmd(execCreateCmdResponse.getId())
+                .exec(new ExecStartResultCallback(outputStream, System.err))
+                .awaitCompletion();
     }
 
     @AfterAll

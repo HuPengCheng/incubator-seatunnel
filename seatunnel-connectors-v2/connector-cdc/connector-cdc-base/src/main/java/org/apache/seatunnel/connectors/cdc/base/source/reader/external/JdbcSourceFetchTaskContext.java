@@ -23,14 +23,17 @@ import org.apache.seatunnel.connectors.cdc.base.config.SourceConfig;
 import org.apache.seatunnel.connectors.cdc.base.dialect.JdbcDataSourceDialect;
 import org.apache.seatunnel.connectors.cdc.base.relational.JdbcSourceEventDispatcher;
 import org.apache.seatunnel.connectors.cdc.base.utils.SourceRecordUtils;
+import org.apache.seatunnel.connectors.cdc.debezium.ConnectTableChangeSerializer;
 
 import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.json.JsonConverter;
 import org.apache.kafka.connect.source.SourceRecord;
 
 import io.debezium.config.CommonConnectorConfig;
 import io.debezium.data.Envelope;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.spi.OffsetContext;
+import io.debezium.pipeline.spi.Partition;
 import io.debezium.relational.RelationalDatabaseSchema;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
@@ -38,6 +41,7 @@ import io.debezium.util.SchemaNameAdjuster;
 
 import java.time.Instant;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -49,6 +53,9 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
     protected final JdbcDataSourceDialect dataSourceDialect;
     protected final CommonConnectorConfig dbzConnectorConfig;
     protected final SchemaNameAdjuster schemaNameAdjuster;
+    protected final ConnectTableChangeSerializer tableChangeSerializer =
+            new ConnectTableChangeSerializer();
+    protected final JsonConverter jsonConverter;
 
     public JdbcSourceFetchTaskContext(
             JdbcSourceConfig sourceConfig, JdbcDataSourceDialect dataSourceDialect) {
@@ -56,11 +63,13 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
         this.dataSourceDialect = dataSourceDialect;
         this.dbzConnectorConfig = sourceConfig.getDbzConnectorConfig();
         this.schemaNameAdjuster = SchemaNameAdjuster.create();
+        this.jsonConverter = new JsonConverter();
+        jsonConverter.configure(Collections.singletonMap("schemas.enable", true), false);
     }
 
     @Override
     public TableId getTableId(SourceRecord record) {
-        return null;
+        return SourceRecordUtils.getTableId(record);
     }
 
     @Override
@@ -71,12 +80,11 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
     @Override
     public boolean isRecordBetween(SourceRecord record, Object[] splitStart, Object[] splitEnd) {
         SeaTunnelRowType splitKeyType =
-                getSplitType(getDatabaseSchema().tableFor(SourceRecordUtils.getTableId(record)));
+                getSplitType(getDatabaseSchema().tableFor(getTableId(record)));
         Object[] key = SourceRecordUtils.getSplitKey(splitKeyType, record, getSchemaNameAdjuster());
         return SourceRecordUtils.splitKeyRangeContains(key, splitStart, splitEnd);
     }
 
-    @SuppressWarnings("checkstyle:MissingSwitchDefault")
     @Override
     public void rewriteOutputBuffer(
             Map<Struct, SourceRecord> outputBuffer, SourceRecord changeRecord) {
@@ -151,6 +159,11 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
         return sourceConfig;
     }
 
+    @Override
+    public boolean isExactlyOnce() {
+        return sourceConfig.isExactlyOnce();
+    }
+
     public JdbcDataSourceDialect getDataSourceDialect() {
         return dataSourceDialect;
     }
@@ -172,4 +185,6 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
     public abstract JdbcSourceEventDispatcher getDispatcher();
 
     public abstract OffsetContext getOffsetContext();
+
+    public abstract Partition getPartition();
 }

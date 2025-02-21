@@ -18,24 +18,29 @@
 package org.apache.seatunnel.engine.server.task;
 
 import org.apache.seatunnel.api.serialization.Serializer;
+import org.apache.seatunnel.api.source.Boundedness;
 import org.apache.seatunnel.api.source.SourceEvent;
 import org.apache.seatunnel.api.source.SourceSplit;
 import org.apache.seatunnel.api.source.SourceSplitEnumerator;
+import org.apache.seatunnel.api.source.event.EnumeratorCloseEvent;
+import org.apache.seatunnel.api.source.event.EnumeratorOpenEvent;
 import org.apache.seatunnel.engine.core.dag.actions.SourceAction;
+import org.apache.seatunnel.engine.core.job.ConnectorJarIdentifier;
 import org.apache.seatunnel.engine.server.checkpoint.ActionStateKey;
 import org.apache.seatunnel.engine.server.checkpoint.ActionSubtaskState;
 import org.apache.seatunnel.engine.server.checkpoint.CheckpointBarrier;
 import org.apache.seatunnel.engine.server.checkpoint.operation.TaskAcknowledgeOperation;
+import org.apache.seatunnel.engine.server.event.JobEventListener;
 import org.apache.seatunnel.engine.server.execution.ProgressState;
 import org.apache.seatunnel.engine.server.execution.TaskLocation;
 import org.apache.seatunnel.engine.server.task.context.SeaTunnelSplitEnumeratorContext;
 import org.apache.seatunnel.engine.server.task.operation.checkpoint.BarrierFlowOperation;
+import org.apache.seatunnel.engine.server.task.operation.source.CloseIdleReaderOperation;
 import org.apache.seatunnel.engine.server.task.operation.source.LastCheckpointNotifyOperation;
 import org.apache.seatunnel.engine.server.task.record.Barrier;
 import org.apache.seatunnel.engine.server.task.statemachine.SeaTunnelTaskState;
 
 import com.hazelcast.cluster.Address;
-import com.hazelcast.spi.impl.operationservice.Operation;
 import com.hazelcast.spi.impl.operationservice.impl.InvocationFuture;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
@@ -55,7 +60,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutionException;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.apache.seatunnel.engine.common.utils.ExceptionUtil.sneaky;
@@ -77,6 +81,7 @@ public class SourceSplitEnumeratorTask<SplitT extends SourceSplit> extends Coord
     private SeaTunnelSplitEnumeratorContext<SplitT> enumeratorContext;
 
     private Serializer<Serializable> enumeratorStateSerializer;
+    private Serializer<SplitT> splitSerializer;
 
     private int maxReaderSize;
     private Set<Long> unfinishedReaders;
@@ -100,8 +105,12 @@ public class SourceSplitEnumeratorTask<SplitT extends SourceSplit> extends Coord
                         + source.getName());
         enumeratorContext =
                 new SeaTunnelSplitEnumeratorContext<>(
-                        this.source.getParallelism(), this, getMetricsContext());
+                        this.source.getParallelism(),
+                        this,
+                        getMetricsContext(),
+                        new JobEventListener(taskLocation, getExecutionContext()));
         enumeratorStateSerializer = this.source.getSource().getEnumeratorStateSerializer();
+        splitSerializer = this.source.getSource().getSplitSerializer();
         taskMemberMapping = new ConcurrentHashMap<>();
         taskIDToTaskLocationMapping = new ConcurrentHashMap<>();
         taskIndexToTaskLocationMapping = new ConcurrentHashMap<>();
@@ -114,6 +123,7 @@ public class SourceSplitEnumeratorTask<SplitT extends SourceSplit> extends Coord
         super.close();
         if (enumerator != null) {
             enumerator.close();
+            enumeratorContext.getEventListener().onEvent(new EnumeratorCloseEvent());
         }
         progress.done();
     }
@@ -134,8 +144,10 @@ public class SourceSplitEnumeratorTask<SplitT extends SourceSplit> extends Coord
 
     @Override
     public void triggerBarrier(Barrier barrier) throws Exception {
+        long startTime = System.currentTimeMillis();
+
         log.debug("split enumer trigger barrier [{}]", barrier);
-        if (barrier.prepareClose()) {
+        if (barrier.prepareClose(this.taskLocation)) {
             this.prepareCloseTriggered = true;
             this.prepareCloseBarrierId.set(barrier.getId());
         }
@@ -149,7 +161,7 @@ public class SourceSplitEnumeratorTask<SplitT extends SourceSplit> extends Coord
                 serialize = enumeratorStateSerializer.serialize(snapshotState);
             }
             log.debug("source split enumerator send state [{}] to master", snapshotState);
-            sendToAllReader(location -> new BarrierFlowOperation(barrier, location));
+            sendToActiveReader(barrier);
         }
         if (barrier.snapshot()) {
             this.getExecutionContext()
@@ -164,6 +176,12 @@ public class SourceSplitEnumeratorTask<SplitT extends SourceSplit> extends Coord
                                                     Collections.singletonList(serialize)))))
                     .join();
         }
+
+        log.debug(
+                "trigger barrier [{}] finished, cost {}ms. taskLocation [{}]",
+                barrier.getId(),
+                System.currentTimeMillis() - startTime,
+                taskLocation);
     }
 
     @Override
@@ -186,12 +204,18 @@ public class SourceSplitEnumeratorTask<SplitT extends SourceSplit> extends Coord
         log.debug("restoreState split enumerator [{}] finished", actionStateList);
     }
 
-    public void addSplitsBack(List<SplitT> splits, int subtaskId)
+    public Serializer<SplitT> getSplitSerializer() throws ExecutionException, InterruptedException {
+        // Because the splitSerializer is initialized in the init method, it's necessary to wait for
+        // the Enumerator to finish initializing.
+        getEnumerator();
+        return splitSerializer;
+    }
+
+    public synchronized void addSplitsBack(List<SplitT> splits, int subtaskId)
             throws ExecutionException, InterruptedException {
         getEnumerator().addSplitsBack(splits, subtaskId);
     }
 
-    @SuppressWarnings("checkstyle:MagicNumber")
     public void receivedReader(TaskLocation readerId, Address memberAddr)
             throws InterruptedException, ExecutionException {
         log.info("received reader register, readerID: " + readerId);
@@ -243,7 +267,6 @@ public class SourceSplitEnumeratorTask<SplitT extends SourceSplit> extends Coord
         return taskIndexToTaskLocationMapping.get(taskIndex);
     }
 
-    @SuppressWarnings("checkstyle:MagicNumber")
     private SourceSplitEnumerator<SplitT, Serializable> getEnumerator()
             throws InterruptedException, ExecutionException {
         // (restoreComplete == null) means that the Task has not yet executed Init, so we need to
@@ -256,14 +279,21 @@ public class SourceSplitEnumeratorTask<SplitT extends SourceSplit> extends Coord
         return enumerator;
     }
 
-    public void readerFinished(long taskID) {
-        unfinishedReaders.remove(taskID);
+    public void readerFinished(TaskLocation taskLocation) {
+        unfinishedReaders.remove(taskLocation.getTaskID());
         if (unfinishedReaders.isEmpty()) {
             prepareCloseStatus = true;
+        } else if (Boundedness.UNBOUNDED.equals(this.source.getSource().getBoundedness())) {
+            log.info(
+                    "Send close idle reader {} operation of unbounded job. {}",
+                    taskLocation.getTaskIndex(),
+                    taskLocation);
+            this.getExecutionContext()
+                    .sendToMaster(new CloseIdleReaderOperation(jobID, taskLocation))
+                    .join();
         }
     }
 
-    @SuppressWarnings("checkstyle:MagicNumber")
     private void stateProcess() throws Exception {
         switch (currState) {
             case INIT:
@@ -282,6 +312,7 @@ public class SourceSplitEnumeratorTask<SplitT extends SourceSplit> extends Coord
                 if (startCalled && readerRegisterComplete) {
                     currState = STARTING;
                     enumerator.open();
+                    enumeratorContext.getEventListener().onEvent(new EnumeratorOpenEvent());
                 } else {
                     Thread.sleep(100);
                 }
@@ -329,10 +360,13 @@ public class SourceSplitEnumeratorTask<SplitT extends SourceSplit> extends Coord
                 .collect(Collectors.toSet());
     }
 
-    private void sendToAllReader(Function<TaskLocation, Operation> function) {
+    private void sendToActiveReader(Barrier barrier) {
         List<InvocationFuture<?>> futures = new ArrayList<>();
         taskMemberMapping.forEach(
                 (location, address) -> {
+                    if (barrier.closedTasks().contains(location)) {
+                        return;
+                    }
                     log.debug(
                             "split enumerator send to read--size: {}, location: {}, address: {}",
                             taskMemberMapping.size(),
@@ -340,7 +374,8 @@ public class SourceSplitEnumeratorTask<SplitT extends SourceSplit> extends Coord
                             address.toString());
                     futures.add(
                             this.getExecutionContext()
-                                    .sendToMember(function.apply(location), address));
+                                    .sendToMember(
+                                            new BarrierFlowOperation(barrier, location), address));
                 });
         futures.forEach(InvocationFuture::join);
     }
@@ -348,6 +383,11 @@ public class SourceSplitEnumeratorTask<SplitT extends SourceSplit> extends Coord
     @Override
     public Set<URL> getJarsUrl() {
         return new HashSet<>(source.getJarUrls());
+    }
+
+    @Override
+    public Set<ConnectorJarIdentifier> getConnectorPluginJars() {
+        return new HashSet<>(source.getConnectorJarIdentifiers());
     }
 
     @Override

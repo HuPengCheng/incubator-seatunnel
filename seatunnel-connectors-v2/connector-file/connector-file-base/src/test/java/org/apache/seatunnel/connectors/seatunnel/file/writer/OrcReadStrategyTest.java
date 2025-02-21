@@ -29,7 +29,10 @@ import org.apache.seatunnel.connectors.seatunnel.file.source.reader.OrcReadStrat
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.net.URL;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -37,6 +40,7 @@ import java.util.List;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_DEFAULT_NAME_DEFAULT;
 
+@Slf4j
 public class OrcReadStrategyTest {
 
     @Test
@@ -49,15 +53,27 @@ public class OrcReadStrategyTest {
         orcReadStrategy.init(localConf);
         TestCollector testCollector = new TestCollector();
         SeaTunnelRowType seaTunnelRowTypeInfo =
-                orcReadStrategy.getSeaTunnelRowTypeInfo(localConf, orcFilePath);
+                orcReadStrategy.getSeaTunnelRowTypeInfo(orcFilePath);
         Assertions.assertNotNull(seaTunnelRowTypeInfo);
-        System.out.println(seaTunnelRowTypeInfo);
-        orcReadStrategy.read(orcFilePath, testCollector);
+        log.info(seaTunnelRowTypeInfo.toString());
+        orcReadStrategy.read(orcFilePath, "", testCollector);
         for (SeaTunnelRow row : testCollector.getRows()) {
             Assertions.assertEquals(row.getField(0).getClass(), Boolean.class);
             Assertions.assertEquals(row.getField(1).getClass(), Byte.class);
             Assertions.assertEquals(row.getField(16).getClass(), SeaTunnelRow.class);
         }
+    }
+
+    @Test
+    public void testReadNotExistedFile() throws Exception {
+        OrcReadStrategy orcReadStrategy = new OrcReadStrategy();
+        LocalConf localConf = new LocalConf(FS_DEFAULT_NAME_DEFAULT);
+        orcReadStrategy.init(localConf);
+        Exception exception =
+                Assertions.assertThrows(
+                        Exception.class,
+                        () -> orcReadStrategy.getSeaTunnelRowTypeInfo("not_existed_file.orc"));
+        Assertions.assertInstanceOf(FileNotFoundException.class, exception.getCause());
     }
 
     @Test
@@ -75,10 +91,10 @@ public class OrcReadStrategyTest {
         orcReadStrategy.setPluginConfig(pluginConfig);
         TestCollector testCollector = new TestCollector();
         SeaTunnelRowType seaTunnelRowTypeInfo =
-                orcReadStrategy.getSeaTunnelRowTypeInfo(localConf, orcFilePath);
+                orcReadStrategy.getSeaTunnelRowTypeInfo(orcFilePath);
         Assertions.assertNotNull(seaTunnelRowTypeInfo);
-        System.out.println(seaTunnelRowTypeInfo);
-        orcReadStrategy.read(orcFilePath, testCollector);
+        log.info(seaTunnelRowTypeInfo.toString());
+        orcReadStrategy.read(orcFilePath, "", testCollector);
         for (SeaTunnelRow row : testCollector.getRows()) {
             Assertions.assertEquals(row.getField(0).getClass(), Byte.class);
             Assertions.assertEquals(row.getField(1).getClass(), Boolean.class);
@@ -93,10 +109,9 @@ public class OrcReadStrategyTest {
             return rows;
         }
 
-        @SuppressWarnings("checkstyle:RegexpSingleline")
         @Override
         public void collect(SeaTunnelRow record) {
-            System.out.println(record);
+            log.info(record.toString());
             rows.add(record);
         }
 

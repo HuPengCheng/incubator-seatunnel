@@ -26,9 +26,7 @@ import org.apache.seatunnel.core.starter.exception.TaskExecuteException;
 import org.apache.seatunnel.core.starter.execution.PluginExecuteProcessor;
 import org.apache.seatunnel.core.starter.execution.RuntimeEnvironment;
 import org.apache.seatunnel.core.starter.execution.TaskExecution;
-
-import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.Row;
+import org.apache.seatunnel.translation.spark.execution.DatasetTableInfo;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -39,17 +37,19 @@ import java.util.List;
 @Slf4j
 public class SparkExecution implements TaskExecution {
     private final SparkRuntimeEnvironment sparkRuntimeEnvironment;
-    private final PluginExecuteProcessor<Dataset<Row>, SparkRuntimeEnvironment>
+    private final PluginExecuteProcessor<DatasetTableInfo, SparkRuntimeEnvironment>
             sourcePluginExecuteProcessor;
-    private final PluginExecuteProcessor<Dataset<Row>, SparkRuntimeEnvironment>
+    private final PluginExecuteProcessor<DatasetTableInfo, SparkRuntimeEnvironment>
             transformPluginExecuteProcessor;
-    private final PluginExecuteProcessor<Dataset<Row>, SparkRuntimeEnvironment>
+    private final PluginExecuteProcessor<DatasetTableInfo, SparkRuntimeEnvironment>
             sinkPluginExecuteProcessor;
 
     public SparkExecution(Config config) {
         this.sparkRuntimeEnvironment = SparkRuntimeEnvironment.getInstance(config);
         JobContext jobContext = new JobContext();
         jobContext.setJobMode(RuntimeEnvironment.getJobMode(config));
+        jobContext.setEnableCheckpoint(RuntimeEnvironment.getEnableCheckpoint(config));
+
         this.sourcePluginExecuteProcessor =
                 new SourceExecuteProcessor(
                         sparkRuntimeEnvironment,
@@ -68,7 +68,7 @@ public class SparkExecution implements TaskExecution {
 
     @Override
     public void execute() throws TaskExecuteException {
-        List<Dataset<Row>> datasets = new ArrayList<>();
+        List<DatasetTableInfo> datasets = new ArrayList<>();
         datasets = sourcePluginExecuteProcessor.execute(datasets);
         datasets = transformPluginExecuteProcessor.execute(datasets);
         sinkPluginExecuteProcessor.execute(datasets);

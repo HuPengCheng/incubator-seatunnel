@@ -26,20 +26,20 @@ import org.apache.seatunnel.api.serialization.Serializer;
 import org.apache.seatunnel.api.sink.SeaTunnelSink;
 import org.apache.seatunnel.api.sink.SinkAggregatedCommitter;
 import org.apache.seatunnel.api.sink.SinkWriter;
-import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
+import org.apache.seatunnel.api.table.catalog.CatalogTableUtil;
+import org.apache.seatunnel.api.table.catalog.TablePath;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
+import org.apache.seatunnel.connectors.seatunnel.file.config.BaseSinkConfig;
 import org.apache.seatunnel.connectors.seatunnel.file.config.HadoopConf;
 import org.apache.seatunnel.connectors.seatunnel.file.sink.commit.FileAggregatedCommitInfo;
 import org.apache.seatunnel.connectors.seatunnel.file.sink.commit.FileCommitInfo;
 import org.apache.seatunnel.connectors.seatunnel.file.sink.commit.FileSinkAggregatedCommitter;
 import org.apache.seatunnel.connectors.seatunnel.file.sink.config.FileSinkConfig;
 import org.apache.seatunnel.connectors.seatunnel.file.sink.state.FileSinkState;
-import org.apache.seatunnel.connectors.seatunnel.file.sink.util.FileSystemUtils;
 import org.apache.seatunnel.connectors.seatunnel.file.sink.writer.WriteStrategy;
 import org.apache.seatunnel.connectors.seatunnel.file.sink.writer.WriteStrategyFactory;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 
@@ -49,50 +49,54 @@ public abstract class BaseFileSink
     protected SeaTunnelRowType seaTunnelRowType;
     protected Config pluginConfig;
     protected HadoopConf hadoopConf;
-    protected FileSystemUtils fileSystemUtils;
     protected FileSinkConfig fileSinkConfig;
-    protected WriteStrategy writeStrategy;
     protected JobContext jobContext;
     protected String jobId;
+
+    public void preCheckConfig() {
+        if (pluginConfig.hasPath(BaseSinkConfig.SINGLE_FILE_MODE.key())
+                && pluginConfig.getBoolean(BaseSinkConfig.SINGLE_FILE_MODE.key())
+                && jobContext.isEnableCheckpoint()) {
+            throw new IllegalArgumentException(
+                    "Single file mode is not supported when checkpoint is enabled or in streaming mode.");
+        }
+        if (pluginConfig.hasPath(BaseSinkConfig.CREATE_EMPTY_FILE_WHEN_NO_DATA.key())
+                && pluginConfig.getBoolean(BaseSinkConfig.CREATE_EMPTY_FILE_WHEN_NO_DATA.key())
+                && !fileSinkConfig.getPartitionFieldList().isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Generate empty file when no data is not supported when partition is enabled.");
+        }
+    }
 
     @Override
     public void setJobContext(JobContext jobContext) {
         this.jobContext = jobContext;
         this.jobId = jobContext.getJobId();
+        preCheckConfig();
     }
 
     @Override
     public void setTypeInfo(SeaTunnelRowType seaTunnelRowType) {
         this.seaTunnelRowType = seaTunnelRowType;
         this.fileSinkConfig = new FileSinkConfig(pluginConfig, seaTunnelRowType);
-        this.writeStrategy =
-                WriteStrategyFactory.of(fileSinkConfig.getFileFormat(), fileSinkConfig);
-        this.fileSystemUtils = new FileSystemUtils(hadoopConf);
-        this.writeStrategy.setSeaTunnelRowTypeInfo(seaTunnelRowType);
-        this.writeStrategy.setFileSystemUtils(fileSystemUtils);
-    }
-
-    @Override
-    public SeaTunnelDataType<SeaTunnelRow> getConsumedType() {
-        return seaTunnelRowType;
     }
 
     @Override
     public SinkWriter<SeaTunnelRow, FileCommitInfo, FileSinkState> restoreWriter(
-            SinkWriter.Context context, List<FileSinkState> states) throws IOException {
-        return new BaseFileSinkWriter(writeStrategy, hadoopConf, context, jobId, states);
+            SinkWriter.Context context, List<FileSinkState> states) {
+        return new BaseFileSinkWriter(createWriteStrategy(), hadoopConf, context, jobId, states);
     }
 
     @Override
     public Optional<SinkAggregatedCommitter<FileCommitInfo, FileAggregatedCommitInfo>>
-            createAggregatedCommitter() throws IOException {
-        return Optional.of(new FileSinkAggregatedCommitter(fileSystemUtils));
+            createAggregatedCommitter() {
+        return Optional.of(new FileSinkAggregatedCommitter(hadoopConf));
     }
 
     @Override
     public SinkWriter<SeaTunnelRow, FileCommitInfo, FileSinkState> createWriter(
-            SinkWriter.Context context) throws IOException {
-        return new BaseFileSinkWriter(writeStrategy, hadoopConf, context, jobId);
+            SinkWriter.Context context) {
+        return new BaseFileSinkWriter(createWriteStrategy(), hadoopConf, context, jobId);
     }
 
     @Override
@@ -120,5 +124,14 @@ public abstract class BaseFileSink
     @Override
     public void prepare(Config pluginConfig) throws PrepareFailException {
         this.pluginConfig = pluginConfig;
+    }
+
+    protected WriteStrategy createWriteStrategy() {
+        WriteStrategy writeStrategy =
+                WriteStrategyFactory.of(fileSinkConfig.getFileFormat(), fileSinkConfig);
+        writeStrategy.setCatalogTable(
+                CatalogTableUtil.getCatalogTable(
+                        "file", null, null, TablePath.DEFAULT.getTableName(), seaTunnelRowType));
+        return writeStrategy;
     }
 }

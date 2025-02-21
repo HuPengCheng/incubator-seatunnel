@@ -21,6 +21,7 @@ import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
 import org.apache.seatunnel.api.common.PrepareFailException;
 import org.apache.seatunnel.api.common.SeaTunnelAPIErrorCode;
+import org.apache.seatunnel.api.options.ConnectorCommonOptions;
 import org.apache.seatunnel.api.source.Boundedness;
 import org.apache.seatunnel.api.source.SeaTunnelSource;
 import org.apache.seatunnel.api.source.SupportColumnProjection;
@@ -58,7 +59,7 @@ public class Neo4jSource extends AbstractSingleSplitSource<SeaTunnelRow>
     public void prepare(Config pluginConfig) throws PrepareFailException {
 
         final CheckResult configCheck =
-                CheckConfigUtil.checkAllExists(pluginConfig, CatalogTableUtil.SCHEMA.key());
+                CheckConfigUtil.checkAllExists(pluginConfig, ConnectorCommonOptions.SCHEMA.key());
 
         if (!configCheck.isSuccess()) {
             throw new Neo4jConnectorException(

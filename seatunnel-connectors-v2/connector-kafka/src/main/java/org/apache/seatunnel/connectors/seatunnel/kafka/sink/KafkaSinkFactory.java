@@ -20,14 +20,11 @@ package org.apache.seatunnel.connectors.seatunnel.kafka.sink;
 import org.apache.seatunnel.api.configuration.util.OptionRule;
 import org.apache.seatunnel.api.table.connector.TableSink;
 import org.apache.seatunnel.api.table.factory.Factory;
-import org.apache.seatunnel.api.table.factory.TableFactoryContext;
 import org.apache.seatunnel.api.table.factory.TableSinkFactory;
-import org.apache.seatunnel.connectors.seatunnel.kafka.config.Config;
-import org.apache.seatunnel.connectors.seatunnel.kafka.config.MessageFormat;
+import org.apache.seatunnel.api.table.factory.TableSinkFactoryContext;
+import org.apache.seatunnel.connectors.seatunnel.kafka.config.KafkaSinkOptions;
 
 import com.google.auto.service.AutoService;
-
-import java.util.Arrays;
 
 @AutoService(Factory.class)
 public class KafkaSinkFactory implements TableSinkFactory {
@@ -39,27 +36,20 @@ public class KafkaSinkFactory implements TableSinkFactory {
     @Override
     public OptionRule optionRule() {
         return OptionRule.builder()
-                .required(Config.FORMAT, Config.BOOTSTRAP_SERVERS)
-                .conditional(
-                        Config.FORMAT,
-                        Arrays.asList(
-                                MessageFormat.JSON, MessageFormat.CANAL_JSON, MessageFormat.TEXT),
-                        Config.TOPIC)
+                .required(KafkaSinkOptions.TOPIC, KafkaSinkOptions.BOOTSTRAP_SERVERS)
                 .optional(
-                        Config.KAFKA_CONFIG,
-                        Config.ASSIGN_PARTITIONS,
-                        Config.TRANSACTION_PREFIX,
-                        Config.SEMANTICS,
-                        Config.PARTITION,
-                        Config.PARTITION_KEY_FIELDS)
+                        KafkaSinkOptions.FORMAT,
+                        KafkaSinkOptions.KAFKA_CONFIG,
+                        KafkaSinkOptions.ASSIGN_PARTITIONS,
+                        KafkaSinkOptions.TRANSACTION_PREFIX,
+                        KafkaSinkOptions.SEMANTICS,
+                        KafkaSinkOptions.PARTITION,
+                        KafkaSinkOptions.PARTITION_KEY_FIELDS)
                 .build();
     }
 
     @Override
-    public TableSink createSink(TableFactoryContext context) {
-        return () ->
-                new KafkaSink(
-                        context.getOptions(),
-                        context.getCatalogTable().getTableSchema().toPhysicalRowDataType());
+    public TableSink createSink(TableSinkFactoryContext context) {
+        return () -> new KafkaSink(context.getOptions(), context.getCatalogTable());
     }
 }

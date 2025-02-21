@@ -23,16 +23,21 @@ import org.apache.seatunnel.e2e.common.junit.ContainerTestingExtension;
 import org.apache.seatunnel.e2e.common.junit.TestCaseInvocationContextProvider;
 import org.apache.seatunnel.e2e.common.junit.TestContainers;
 import org.apache.seatunnel.e2e.common.junit.TestLoggerExtension;
+import org.apache.seatunnel.e2e.common.junit.TimingExtension;
 import org.apache.seatunnel.e2e.common.util.ContainerUtil;
 
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.Network;
+
+import com.github.dockerjava.api.DockerClient;
 
 @ExtendWith({
     ContainerTestingExtension.class,
     TestLoggerExtension.class,
-    TestCaseInvocationContextProvider.class
+    TestCaseInvocationContextProvider.class,
+    TimingExtension.class
 })
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class TestSuiteBase {
@@ -41,4 +46,6 @@ public abstract class TestSuiteBase {
 
     @TestContainers
     private TestContainersFactory containersFactory = ContainerUtil::discoverTestContainers;
+
+    protected DockerClient dockerClient = DockerClientFactory.lazyClient();
 }

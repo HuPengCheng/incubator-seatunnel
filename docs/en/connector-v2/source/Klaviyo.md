@@ -30,7 +30,7 @@ Used to read data from Klaviyo.
 | body                        | String  | No       | -             |
 | json_field                  | Config  | No       | -             |
 | content_json                | String  | No       | -             |
-| poll_interval_ms            | int     | No       | -             |
+| poll_interval_millis        | int     | No       | -             |
 | retry                       | int     | No       | -             |
 | retry_backoff_multiplier_ms | int     | No       | 100           |
 | retry_backoff_max_ms        | int     | No       | 10000         |
@@ -45,7 +45,7 @@ http request url
 
 API private key for login, you can get more detail at this link:
 
-https://developers.klaviyo.com/en/docs/retrieve_api_credentials
+https://developers.klaviyo.com/en/docs/authenticate_#private-key-authentication
 
 ### revision [String]
 
@@ -63,7 +63,7 @@ http params
 
 http body
 
-### poll_interval_ms [int]
+### poll_interval_millis [int]
 
 request http api interval(millis) in stream mode
 
@@ -275,7 +275,7 @@ source {
 
 ### common options
 
-Source plugin common parameters, please refer to [Source Common Options](common-options.md) for details
+Source plugin common parameters, please refer to [Source Common Options](../source-common-options.md) for details
 
 ## Example
 

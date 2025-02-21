@@ -22,6 +22,7 @@ import org.apache.seatunnel.shade.com.typesafe.config.Config;
 import org.apache.seatunnel.api.common.JobContext;
 import org.apache.seatunnel.api.common.PrepareFailException;
 import org.apache.seatunnel.api.common.SeaTunnelAPIErrorCode;
+import org.apache.seatunnel.api.options.ConnectorCommonOptions;
 import org.apache.seatunnel.api.source.Boundedness;
 import org.apache.seatunnel.api.source.SeaTunnelSource;
 import org.apache.seatunnel.api.source.SourceReader;
@@ -43,9 +44,7 @@ import com.google.auto.service.AutoService;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.apache.seatunnel.connectors.seatunnel.iotdb.config.SourceConfig.HOST;
 import static org.apache.seatunnel.connectors.seatunnel.iotdb.config.SourceConfig.NODE_URLS;
-import static org.apache.seatunnel.connectors.seatunnel.iotdb.config.SourceConfig.PORT;
 
 @AutoService(SeaTunnelSource.class)
 public class IoTDBSource
@@ -66,13 +65,9 @@ public class IoTDBSource
 
     @Override
     public void prepare(Config pluginConfig) throws PrepareFailException {
-        CheckResult urlCheckResult =
-                CheckConfigUtil.checkAllExists(pluginConfig, HOST.key(), PORT.key());
-        if (!urlCheckResult.isSuccess()) {
-            urlCheckResult = CheckConfigUtil.checkAllExists(pluginConfig, NODE_URLS.key());
-        }
+        CheckResult urlCheckResult = CheckConfigUtil.checkAllExists(pluginConfig, NODE_URLS.key());
         CheckResult schemaCheckResult =
-                CheckConfigUtil.checkAllExists(pluginConfig, CatalogTableUtil.SCHEMA.key());
+                CheckConfigUtil.checkAllExists(pluginConfig, ConnectorCommonOptions.SCHEMA.key());
         CheckResult mergedConfigCheck =
                 CheckConfigUtil.mergeCheckResults(urlCheckResult, schemaCheckResult);
         if (!mergedConfigCheck.isSuccess()) {

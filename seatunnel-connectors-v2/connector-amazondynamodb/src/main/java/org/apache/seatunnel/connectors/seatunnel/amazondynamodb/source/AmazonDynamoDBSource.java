@@ -17,70 +17,40 @@
 
 package org.apache.seatunnel.connectors.seatunnel.amazondynamodb.source;
 
-import org.apache.seatunnel.shade.com.typesafe.config.Config;
-
-import org.apache.seatunnel.api.common.PrepareFailException;
-import org.apache.seatunnel.api.common.SeaTunnelAPIErrorCode;
 import org.apache.seatunnel.api.source.Boundedness;
 import org.apache.seatunnel.api.source.SeaTunnelSource;
+import org.apache.seatunnel.api.source.SourceReader;
+import org.apache.seatunnel.api.source.SourceSplitEnumerator;
 import org.apache.seatunnel.api.source.SupportColumnProjection;
-import org.apache.seatunnel.api.table.catalog.CatalogTableUtil;
-import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
+import org.apache.seatunnel.api.source.SupportParallelism;
+import org.apache.seatunnel.api.table.catalog.CatalogTable;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
-import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
-import org.apache.seatunnel.common.config.CheckConfigUtil;
-import org.apache.seatunnel.common.config.CheckResult;
-import org.apache.seatunnel.common.constants.PluginType;
-import org.apache.seatunnel.connectors.seatunnel.amazondynamodb.config.AmazonDynamoDBSourceOptions;
-import org.apache.seatunnel.connectors.seatunnel.amazondynamodb.exception.AmazonDynamoDBConnectorException;
-import org.apache.seatunnel.connectors.seatunnel.common.source.AbstractSingleSplitReader;
-import org.apache.seatunnel.connectors.seatunnel.common.source.AbstractSingleSplitSource;
-import org.apache.seatunnel.connectors.seatunnel.common.source.SingleSplitReaderContext;
+import org.apache.seatunnel.connectors.seatunnel.amazondynamodb.config.AmazonDynamoDBConfig;
 
-import com.google.auto.service.AutoService;
 import lombok.extern.slf4j.Slf4j;
 
-import static org.apache.seatunnel.api.table.catalog.CatalogTableUtil.SCHEMA;
-import static org.apache.seatunnel.connectors.seatunnel.amazondynamodb.config.AmazonDynamoDBConfig.ACCESS_KEY_ID;
-import static org.apache.seatunnel.connectors.seatunnel.amazondynamodb.config.AmazonDynamoDBConfig.REGION;
-import static org.apache.seatunnel.connectors.seatunnel.amazondynamodb.config.AmazonDynamoDBConfig.SECRET_ACCESS_KEY;
-import static org.apache.seatunnel.connectors.seatunnel.amazondynamodb.config.AmazonDynamoDBConfig.TABLE;
-import static org.apache.seatunnel.connectors.seatunnel.amazondynamodb.config.AmazonDynamoDBConfig.URL;
+import java.util.Collections;
+import java.util.List;
 
 @Slf4j
-@AutoService(SeaTunnelSource.class)
-public class AmazonDynamoDBSource extends AbstractSingleSplitSource<SeaTunnelRow>
-        implements SupportColumnProjection {
+public class AmazonDynamoDBSource
+        implements SeaTunnelSource<
+                        SeaTunnelRow, AmazonDynamoDBSourceSplit, AmazonDynamoDBSourceState>,
+                SupportParallelism,
+                SupportColumnProjection {
 
-    private AmazonDynamoDBSourceOptions amazondynamodbSourceOptions;
+    private AmazonDynamoDBConfig amazondynamodbConfig;
+    private CatalogTable catalogTable;
 
-    private SeaTunnelRowType typeInfo;
+    public AmazonDynamoDBSource(
+            AmazonDynamoDBConfig amazondynamodbConfig, CatalogTable catalogTable) {
+        this.amazondynamodbConfig = amazondynamodbConfig;
+        this.catalogTable = catalogTable;
+    }
 
     @Override
     public String getPluginName() {
         return "AmazonDynamodb";
-    }
-
-    @Override
-    public void prepare(Config pluginConfig) throws PrepareFailException {
-        CheckResult result =
-                CheckConfigUtil.checkAllExists(
-                        pluginConfig,
-                        URL.key(),
-                        TABLE.key(),
-                        REGION.key(),
-                        ACCESS_KEY_ID.key(),
-                        SECRET_ACCESS_KEY.key(),
-                        SCHEMA.key());
-        if (!result.isSuccess()) {
-            throw new AmazonDynamoDBConnectorException(
-                    SeaTunnelAPIErrorCode.CONFIG_VALIDATION_FAILED,
-                    String.format(
-                            "PluginName: %s, PluginType: %s, Message: %s",
-                            getPluginName(), PluginType.SOURCE, result.getMsg()));
-        }
-        amazondynamodbSourceOptions = new AmazonDynamoDBSourceOptions(pluginConfig);
-        typeInfo = CatalogTableUtil.buildWithConfig(pluginConfig).getSeaTunnelRowType();
     }
 
     @Override
@@ -89,13 +59,32 @@ public class AmazonDynamoDBSource extends AbstractSingleSplitSource<SeaTunnelRow
     }
 
     @Override
-    public SeaTunnelDataType<SeaTunnelRow> getProducedType() {
-        return this.typeInfo;
+    public List<CatalogTable> getProducedCatalogTables() {
+        return Collections.singletonList(catalogTable);
     }
 
     @Override
-    public AbstractSingleSplitReader<SeaTunnelRow> createReader(
-            SingleSplitReaderContext readerContext) throws Exception {
-        return new AmazonDynamoDBSourceReader(readerContext, amazondynamodbSourceOptions, typeInfo);
+    public SourceSplitEnumerator<AmazonDynamoDBSourceSplit, AmazonDynamoDBSourceState>
+            createEnumerator(
+                    SourceSplitEnumerator.Context<AmazonDynamoDBSourceSplit> enumeratorContext)
+                    throws Exception {
+        return new AmazonDynamoDBSourceSplitEnumerator(enumeratorContext, amazondynamodbConfig);
+    }
+
+    @Override
+    public SourceSplitEnumerator<AmazonDynamoDBSourceSplit, AmazonDynamoDBSourceState>
+            restoreEnumerator(
+                    SourceSplitEnumerator.Context<AmazonDynamoDBSourceSplit> enumeratorContext,
+                    AmazonDynamoDBSourceState checkpointState)
+                    throws Exception {
+        return new AmazonDynamoDBSourceSplitEnumerator(
+                enumeratorContext, amazondynamodbConfig, checkpointState);
+    }
+
+    @Override
+    public SourceReader<SeaTunnelRow, AmazonDynamoDBSourceSplit> createReader(
+            SourceReader.Context readerContext) throws Exception {
+        return new AmazonDynamoDBSourceReader(
+                readerContext, amazondynamodbConfig, catalogTable.getSeaTunnelRowType());
     }
 }

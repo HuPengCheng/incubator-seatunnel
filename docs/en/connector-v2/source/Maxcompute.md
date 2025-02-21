@@ -16,7 +16,7 @@ Used to read data from Maxcompute.
 
 ## Options
 
-|      name      |  type  | required | default value |
+| name           | type   | required | default value |
 |----------------|--------|----------|---------------|
 | accessId       | string | yes      | -             |
 | accesskey      | string | yes      | -             |
@@ -25,7 +25,10 @@ Used to read data from Maxcompute.
 | table_name     | string | yes      | -             |
 | partition_spec | string | no       | -             |
 | split_row      | int    | no       | 10000         |
+| read_columns   | Array  | no       | -             |
+| table_list     | Array  | No       | -             |
 | common-options | string | no       |               |
+| schema         | config | no       |               |
 
 ### accessId [string]
 
@@ -55,11 +58,21 @@ Used to read data from Maxcompute.
 
 `split_row` Number of rows per split, default: 10000.
 
+### read_columns [Array]
+
+`read_columns` The columns to be read, if not set, all columns will be read. e.g. ["col1", "col2"]
+
+### table_list [Array]
+
+The list of tables to be read, you can use this configuration instead of `table_name`.
+
 ### common options
 
-Source plugin common parameters, please refer to [Source Common Options](common-options.md) for details.
+Source plugin common parameters, please refer to [Source Common Options](../source-common-options.md) for details.
 
 ## Examples
+
+### Read with table
 
 ```hocon
 source {
@@ -71,13 +84,36 @@ source {
     table_name="<your table name>"
     #partition_spec="<your partition spec>"
     #split_row = 10000
+    #read_columns = ["col1", "col2"]
   }
 }
 ```
 
-## Changelog
+### Read with table list
 
-### next version
-
-- [Feature] Add Maxcompute Source Connector([3640](https://github.com/apache/seatunnel/pull/3640))
+```hocon
+source {
+  Maxcompute {
+    accessId="<your access id>"
+    accesskey="<your access Key>"
+    endpoint="<http://service.odps.aliyun.com/api>"
+    project="<your project>" # default project
+    table_list = [
+      {
+        table_name = "test_table"
+        #partition_spec="<your partition spec>"
+        #split_row = 10000
+        #read_columns = ["col1", "col2"]
+      },
+      {
+        project = "test_project"
+        table_name = "test_table2"
+        #partition_spec="<your partition spec>"
+        #split_row = 10000
+        #read_columns = ["col1", "col2"]
+      }
+    ]
+  }
+}
+```
 

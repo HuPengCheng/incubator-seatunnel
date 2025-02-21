@@ -8,10 +8,9 @@
 > Flink<br/>
 > SeaTunnel Zeta<br/>
 
-Key Features
-------------
+## Key features
 
-- [ ] [exactly-once](../../concept/connector-v2-features.md)
+- [x] [exactly-once](../../concept/connector-v2-features.md)
 - [x] [cdc](../../concept/connector-v2-features.md)
 
 **Tips**
@@ -28,9 +27,9 @@ This document describes how to set up the MongoDB connector to run data writers 
 In order to use the Mongodb connector, the following dependencies are required.
 They can be downloaded via install-plugin.sh or from the Maven central repository.
 
-| Datasource | Supported Versions |                                                  Dependency                                                   |
-|------------|--------------------|---------------------------------------------------------------------------------------------------------------|
-| MongoDB    | universal          | [Download](https://mvnrepository.com/artifact/org.apache.seatunnel/seatunnel-connectors-v2/connector-mongodb) |
+| Datasource | Supported Versions | Dependency                                                                            |
+|------------|--------------------|---------------------------------------------------------------------------------------|
+| MongoDB    | universal          | [Download](https://mvnrepository.com/artifact/org.apache.seatunnel/connector-mongodb) |
 
 ## Data Type Mapping
 
@@ -73,10 +72,12 @@ The following table lists the field data type mapping from MongoDB BSON type to 
 | retry.interval        | Duration | No       | 1000    | Specifies the retry time interval if writing records to database failed, the unit is millisecond.                            |
 | upsert-enable         | Boolean  | No       | false   | Whether to write documents via upsert mode.                                                                                  |
 | primary-key           | List     | No       | -       | The primary keys for upsert/update. Keys are in `["id","name",...]` format for properties.                                   |
+| transaction           | Boolean  | No       | false   | Whether to use transactions in MongoSink (requires MongoDB 4.2+).                                                            |
+| common-options        |          | No       | -       | Source plugin common parameters, please refer to [Source Common Options](../sink-common-options.md) for details              |
 
-**Tips**
+### Tips
 
-> 1.The data flushing logic of the MongoDB Sink Connector is jointly controlled by three parameters: `buffer-flush.max-rows`, `buffer-flush.interval`, and `checkpoint.interval`.
+> 1.The data flushing logic of the MongoDB Sink Connector is jointly controlled by three parameters: `buffer-flush.max-rows`, `buffer-flush.interval`, and `checkpoint.interval`.<br/>
 > Data flushing will be triggered if any of these conditions are met.<br/>
 > 2.Compatible with the historical parameter `upsert-key`. If `upsert-key` is set, please do not set `primary-key`.<br/>
 
@@ -87,7 +88,7 @@ The following example demonstrates how to create a data synchronization job that
 ```bash
 # Set the basic configuration of the task to be performed
 env {
-  execution.parallelism = 1
+  parallelism = 1
   job.mode = "BATCH"
   checkpoint.interval  = 1000
 }

@@ -21,7 +21,7 @@ import org.apache.seatunnel.api.configuration.ReadonlyConfig;
 import org.apache.seatunnel.api.sink.SinkWriter;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
-import org.apache.seatunnel.common.exception.CommonErrorCode;
+import org.apache.seatunnel.common.exception.CommonErrorCodeDeprecated;
 import org.apache.seatunnel.connectors.seatunnel.kafka.config.KafkaSemantics;
 import org.apache.seatunnel.connectors.seatunnel.kafka.config.MessageFormat;
 import org.apache.seatunnel.connectors.seatunnel.kafka.exception.KafkaConnectorErrorCode;
@@ -43,17 +43,17 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Random;
 
-import static org.apache.seatunnel.connectors.seatunnel.kafka.config.Config.ASSIGN_PARTITIONS;
-import static org.apache.seatunnel.connectors.seatunnel.kafka.config.Config.BOOTSTRAP_SERVERS;
-import static org.apache.seatunnel.connectors.seatunnel.kafka.config.Config.DEFAULT_FIELD_DELIMITER;
-import static org.apache.seatunnel.connectors.seatunnel.kafka.config.Config.FIELD_DELIMITER;
-import static org.apache.seatunnel.connectors.seatunnel.kafka.config.Config.FORMAT;
-import static org.apache.seatunnel.connectors.seatunnel.kafka.config.Config.KAFKA_CONFIG;
-import static org.apache.seatunnel.connectors.seatunnel.kafka.config.Config.PARTITION;
-import static org.apache.seatunnel.connectors.seatunnel.kafka.config.Config.PARTITION_KEY_FIELDS;
-import static org.apache.seatunnel.connectors.seatunnel.kafka.config.Config.SEMANTICS;
-import static org.apache.seatunnel.connectors.seatunnel.kafka.config.Config.TOPIC;
-import static org.apache.seatunnel.connectors.seatunnel.kafka.config.Config.TRANSACTION_PREFIX;
+import static org.apache.seatunnel.connectors.seatunnel.kafka.config.KafkaSinkOptions.ASSIGN_PARTITIONS;
+import static org.apache.seatunnel.connectors.seatunnel.kafka.config.KafkaSinkOptions.BOOTSTRAP_SERVERS;
+import static org.apache.seatunnel.connectors.seatunnel.kafka.config.KafkaSinkOptions.DEFAULT_FIELD_DELIMITER;
+import static org.apache.seatunnel.connectors.seatunnel.kafka.config.KafkaSinkOptions.FIELD_DELIMITER;
+import static org.apache.seatunnel.connectors.seatunnel.kafka.config.KafkaSinkOptions.FORMAT;
+import static org.apache.seatunnel.connectors.seatunnel.kafka.config.KafkaSinkOptions.KAFKA_CONFIG;
+import static org.apache.seatunnel.connectors.seatunnel.kafka.config.KafkaSinkOptions.PARTITION;
+import static org.apache.seatunnel.connectors.seatunnel.kafka.config.KafkaSinkOptions.PARTITION_KEY_FIELDS;
+import static org.apache.seatunnel.connectors.seatunnel.kafka.config.KafkaSinkOptions.SEMANTICS;
+import static org.apache.seatunnel.connectors.seatunnel.kafka.config.KafkaSinkOptions.TOPIC;
+import static org.apache.seatunnel.connectors.seatunnel.kafka.config.KafkaSinkOptions.TRANSACTION_PREFIX;
 
 /** KafkaSinkWriter is a sink writer that will write {@link SeaTunnelRow} to Kafka. */
 public class KafkaSinkWriter implements SinkWriter<SeaTunnelRow, KafkaCommitInfo, KafkaSinkState> {
@@ -140,7 +140,9 @@ public class KafkaSinkWriter implements SinkWriter<SeaTunnelRow, KafkaCommitInfo
             kafkaProducerSender.close();
         } catch (Exception e) {
             throw new KafkaConnectorException(
-                    CommonErrorCode.WRITER_OPERATION_FAILED, "Close kafka sink writer error", e);
+                    CommonErrorCodeDeprecated.WRITER_OPERATION_FAILED,
+                    "Close kafka sink writer error",
+                    e);
         }
     }
 
@@ -186,15 +188,21 @@ public class KafkaSinkWriter implements SinkWriter<SeaTunnelRow, KafkaCommitInfo
                     getPartitionKeyFields(pluginConfig, seaTunnelRowType),
                     seaTunnelRowType,
                     messageFormat,
-                    delimiter);
+                    delimiter,
+                    pluginConfig);
         }
         if (pluginConfig.get(PARTITION) != null) {
             return DefaultSeaTunnelRowSerializer.create(
-                    topic, pluginConfig.get(PARTITION), seaTunnelRowType, messageFormat, delimiter);
+                    topic,
+                    pluginConfig.get(PARTITION),
+                    seaTunnelRowType,
+                    messageFormat,
+                    delimiter,
+                    pluginConfig);
         }
         // By default, all partitions are sent randomly
         return DefaultSeaTunnelRowSerializer.create(
-                topic, Arrays.asList(), seaTunnelRowType, messageFormat, delimiter);
+                topic, Arrays.asList(), seaTunnelRowType, messageFormat, delimiter, pluginConfig);
     }
 
     private KafkaSemantics getKafkaSemantics(ReadonlyConfig pluginConfig) {
@@ -224,7 +232,7 @@ public class KafkaSinkWriter implements SinkWriter<SeaTunnelRow, KafkaCommitInfo
             for (String partitionKeyField : partitionKeyFields) {
                 if (!rowTypeFieldNames.contains(partitionKeyField)) {
                     throw new KafkaConnectorException(
-                            CommonErrorCode.ILLEGAL_ARGUMENT,
+                            CommonErrorCodeDeprecated.ILLEGAL_ARGUMENT,
                             String.format(
                                     "Partition key field not found: %s, rowType: %s",
                                     partitionKeyField, rowTypeFieldNames));

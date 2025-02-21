@@ -24,7 +24,7 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static org.apache.seatunnel.shade.com.google.common.base.Preconditions.checkNotNull;
 
 @Data
 public class ConstraintKey implements Serializable {
@@ -70,9 +70,10 @@ public class ConstraintKey implements Serializable {
     }
 
     public enum ConstraintType {
-        KEY,
+        INDEX_KEY,
         UNIQUE_KEY,
-        FOREIGN_KEY
+        FOREIGN_KEY,
+        VECTOR_INDEX_KEY
     }
 
     public enum ColumnSortType {

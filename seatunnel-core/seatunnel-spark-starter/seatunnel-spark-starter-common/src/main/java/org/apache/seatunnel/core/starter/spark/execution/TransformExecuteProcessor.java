@@ -17,42 +17,54 @@
 
 package org.apache.seatunnel.core.starter.spark.execution;
 
+import org.apache.seatunnel.shade.com.google.common.collect.Lists;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
 import org.apache.seatunnel.api.common.JobContext;
-import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
+import org.apache.seatunnel.api.common.PluginIdentifier;
+import org.apache.seatunnel.api.configuration.ReadonlyConfig;
+import org.apache.seatunnel.api.configuration.util.ConfigValidator;
+import org.apache.seatunnel.api.table.catalog.CatalogTable;
+import org.apache.seatunnel.api.table.factory.TableTransformFactory;
+import org.apache.seatunnel.api.table.factory.TableTransformFactoryContext;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
+import org.apache.seatunnel.api.transform.SeaTunnelFlatMapTransform;
+import org.apache.seatunnel.api.transform.SeaTunnelMapTransform;
 import org.apache.seatunnel.api.transform.SeaTunnelTransform;
+import org.apache.seatunnel.common.constants.EngineType;
+import org.apache.seatunnel.common.constants.PluginType;
 import org.apache.seatunnel.core.starter.exception.TaskExecuteException;
-import org.apache.seatunnel.plugin.discovery.PluginIdentifier;
+import org.apache.seatunnel.plugin.discovery.seatunnel.SeaTunnelFactoryDiscovery;
 import org.apache.seatunnel.plugin.discovery.seatunnel.SeaTunnelTransformPluginDiscovery;
-import org.apache.seatunnel.translation.spark.serialization.SeaTunnelRowConverter;
-import org.apache.seatunnel.translation.spark.utils.TypeConverterUtils;
+import org.apache.seatunnel.translation.spark.execution.DatasetTableInfo;
+import org.apache.seatunnel.translation.spark.execution.MultiTableManager;
 
-import org.apache.spark.api.java.function.MapPartitionsFunction;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder;
 import org.apache.spark.sql.catalyst.encoders.RowEncoder;
-import org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema;
-import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.catalyst.expressions.GenericRow;
 
-import com.google.common.collect.Lists;
 import lombok.extern.slf4j.Slf4j;
 
-import java.io.IOException;
-import java.io.Serializable;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
+
+import static org.apache.seatunnel.api.options.ConnectorCommonOptions.PLUGIN_NAME;
+import static org.apache.seatunnel.api.options.ConnectorCommonOptions.PLUGIN_OUTPUT;
 
 @Slf4j
 public class TransformExecuteProcessor
-        extends SparkAbstractPluginExecuteProcessor<SeaTunnelTransform> {
-
-    private static final String PLUGIN_TYPE = "transform";
+        extends SparkAbstractPluginExecuteProcessor<TableTransformFactory> {
 
     protected TransformExecuteProcessor(
             SparkRuntimeEnvironment sparkRuntimeEnvironment,
@@ -62,134 +74,151 @@ public class TransformExecuteProcessor
     }
 
     @Override
-    protected List<SeaTunnelTransform> initializePlugins(List<? extends Config> pluginConfigs) {
+    protected List<TableTransformFactory> initializePlugins(List<? extends Config> pluginConfigs) {
+
         SeaTunnelTransformPluginDiscovery transformPluginDiscovery =
                 new SeaTunnelTransformPluginDiscovery();
+
+        SeaTunnelFactoryDiscovery factoryDiscovery =
+                new SeaTunnelFactoryDiscovery(TableTransformFactory.class);
+
         List<URL> pluginJars = new ArrayList<>();
-        List<SeaTunnelTransform> transforms =
+        List<TableTransformFactory> transforms =
                 pluginConfigs.stream()
                         .map(
                                 transformConfig -> {
-                                    PluginIdentifier pluginIdentifier =
-                                            PluginIdentifier.of(
-                                                    ENGINE_TYPE,
-                                                    PLUGIN_TYPE,
-                                                    transformConfig.getString(PLUGIN_NAME));
                                     pluginJars.addAll(
                                             transformPluginDiscovery.getPluginJarPaths(
-                                                    Lists.newArrayList(pluginIdentifier)));
-                                    SeaTunnelTransform pluginInstance =
-                                            transformPluginDiscovery.createPluginInstance(
-                                                    pluginIdentifier);
-                                    pluginInstance.prepare(transformConfig);
-                                    pluginInstance.setJobContext(jobContext);
-                                    return pluginInstance;
+                                                    Lists.newArrayList(
+                                                            PluginIdentifier.of(
+                                                                    EngineType.SEATUNNEL
+                                                                            .getEngine(),
+                                                                    PluginType.TRANSFORM.getType(),
+                                                                    transformConfig.getString(
+                                                                            PLUGIN_NAME.key())))));
+                                    return Optional.of(
+                                            (TableTransformFactory)
+                                                    factoryDiscovery.createPluginInstance(
+                                                            PluginIdentifier.of(
+                                                                    EngineType.SEATUNNEL
+                                                                            .getEngine(),
+                                                                    PluginType.TRANSFORM.getType(),
+                                                                    transformConfig.getString(
+                                                                            PLUGIN_NAME.key()))));
                                 })
                         .distinct()
+                        .map(Optional::get)
                         .collect(Collectors.toList());
         sparkRuntimeEnvironment.registerPlugin(pluginJars);
         return transforms;
     }
 
     @Override
-    public List<Dataset<Row>> execute(List<Dataset<Row>> upstreamDataStreams)
+    public List<DatasetTableInfo> execute(List<DatasetTableInfo> upstreamDataStreams)
             throws TaskExecuteException {
         if (plugins.isEmpty()) {
             return upstreamDataStreams;
         }
-        Dataset<Row> input = upstreamDataStreams.get(0);
-        List<Dataset<Row>> result = new ArrayList<>();
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        DatasetTableInfo input = upstreamDataStreams.get(0);
+
+        Map<String, DatasetTableInfo> outputTables =
+                upstreamDataStreams.stream()
+                        .collect(
+                                Collectors.toMap(
+                                        DatasetTableInfo::getTableName,
+                                        e -> e,
+                                        (a, b) -> b,
+                                        LinkedHashMap::new));
         for (int i = 0; i < plugins.size(); i++) {
             try {
-                SeaTunnelTransform<SeaTunnelRow> transform = plugins.get(i);
                 Config pluginConfig = pluginConfigs.get(i);
-                Dataset<Row> stream =
-                        fromSourceTable(pluginConfig, sparkRuntimeEnvironment).orElse(input);
-                input = sparkTransform(transform, stream);
-                registerInputTempView(pluginConfig, input);
-                result.add(input);
+                DatasetTableInfo dataset =
+                        fromSourceTable(
+                                        pluginConfig,
+                                        sparkRuntimeEnvironment,
+                                        new ArrayList<>(outputTables.values()))
+                                .orElse(input);
+                TableTransformFactory factory = plugins.get(i);
+                TableTransformFactoryContext context =
+                        new TableTransformFactoryContext(
+                                dataset.getCatalogTables(),
+                                ReadonlyConfig.fromConfig(pluginConfig),
+                                classLoader);
+                ConfigValidator.of(context.getOptions()).validate(factory.optionRule());
+                SeaTunnelTransform transform = factory.createTransform(context).createTransform();
+
+                Dataset<Row> inputDataset = sparkTransform(transform, dataset);
+                registerInputTempView(pluginConfig, inputDataset);
+                String pluginOutputIdentifier =
+                        ReadonlyConfig.fromConfig(pluginConfig).get(PLUGIN_OUTPUT);
+                outputTables.put(
+                        pluginOutputIdentifier,
+                        new DatasetTableInfo(
+                                inputDataset,
+                                transform.getProducedCatalogTables(),
+                                pluginOutputIdentifier));
             } catch (Exception e) {
                 throw new TaskExecuteException(
                         String.format(
                                 "SeaTunnel transform task: %s execute error",
-                                plugins.get(i).getPluginName()),
+                                plugins.get(i).factoryIdentifier()),
                         e);
             }
         }
-        return result;
+        return new ArrayList<>(outputTables.values());
     }
 
-    private Dataset<Row> sparkTransform(SeaTunnelTransform transform, Dataset<Row> stream)
-            throws IOException {
-        SeaTunnelDataType<?> seaTunnelDataType = TypeConverterUtils.convert(stream.schema());
-        transform.setTypeInfo(seaTunnelDataType);
-        StructType structType =
-                (StructType) TypeConverterUtils.convert(transform.getProducedType());
-        SeaTunnelRowConverter inputRowConverter = new SeaTunnelRowConverter(seaTunnelDataType);
-        SeaTunnelRowConverter outputRowConverter =
-                new SeaTunnelRowConverter(transform.getProducedType());
-        ExpressionEncoder<Row> encoder = RowEncoder.apply(structType);
-        return stream.mapPartitions(
-                        (MapPartitionsFunction<Row, Row>)
-                                (Iterator<Row> rowIterator) -> {
-                                    TransformIterator iterator =
-                                            new TransformIterator(
-                                                    rowIterator,
-                                                    transform,
-                                                    structType,
-                                                    inputRowConverter,
-                                                    outputRowConverter);
-                                    return iterator;
-                                },
+    private Dataset<Row> sparkTransform(SeaTunnelTransform transform, DatasetTableInfo tableInfo) {
+        MultiTableManager inputManager =
+                new MultiTableManager(tableInfo.getCatalogTables().toArray(new CatalogTable[0]));
+        MultiTableManager outputManager =
+                new MultiTableManager(
+                        (CatalogTable[])
+                                transform.getProducedCatalogTables().toArray(new CatalogTable[0]));
+        Dataset<Row> stream = tableInfo.getDataset();
+        ExpressionEncoder<Row> encoder = RowEncoder.apply(outputManager.getTableSchema());
+        return stream.flatMap(
+                        new TransformMapPartitionsFunction(transform, inputManager, outputManager),
                         encoder)
-                .filter(
-                        (Row row) -> {
-                            return row != null;
-                        });
+                .filter(Objects::nonNull);
     }
 
-    private static class TransformIterator implements Iterator<Row>, Serializable {
-        private Iterator<Row> sourceIterator;
+    private static class TransformMapPartitionsFunction implements FlatMapFunction<Row, Row> {
         private SeaTunnelTransform<SeaTunnelRow> transform;
-        private StructType structType;
-        private SeaTunnelRowConverter inputRowConverter;
-        private SeaTunnelRowConverter outputRowConverter;
+        private MultiTableManager inputManager;
+        private MultiTableManager outputManager;
 
-        public TransformIterator(
-                Iterator<Row> sourceIterator,
+        public TransformMapPartitionsFunction(
                 SeaTunnelTransform<SeaTunnelRow> transform,
-                StructType structType,
-                SeaTunnelRowConverter inputRowConverter,
-                SeaTunnelRowConverter outputRowConverter) {
-            this.sourceIterator = sourceIterator;
+                MultiTableManager inputManager,
+                MultiTableManager outputManager) {
             this.transform = transform;
-            this.structType = structType;
-            this.inputRowConverter = inputRowConverter;
-            this.outputRowConverter = outputRowConverter;
+            this.inputManager = inputManager;
+            this.outputManager = outputManager;
         }
 
         @Override
-        public boolean hasNext() {
-            return sourceIterator.hasNext();
-        }
+        public Iterator<Row> call(Row row) throws Exception {
+            List<Row> rows = new ArrayList<>();
 
-        @Override
-        public Row next() {
-            try {
-                Row row = sourceIterator.next();
-                SeaTunnelRow seaTunnelRow =
-                        inputRowConverter.reconvert(
-                                new SeaTunnelRow(((GenericRowWithSchema) row).values()));
-                seaTunnelRow = (SeaTunnelRow) transform.map(seaTunnelRow);
-                if (seaTunnelRow == null) {
-                    return null;
+            SeaTunnelRow seaTunnelRow = inputManager.reconvert((GenericRow) row);
+            if (transform instanceof SeaTunnelFlatMapTransform) {
+                List<SeaTunnelRow> seaTunnelRows =
+                        ((SeaTunnelFlatMapTransform<SeaTunnelRow>) transform).flatMap(seaTunnelRow);
+                if (CollectionUtils.isNotEmpty(seaTunnelRows)) {
+                    for (SeaTunnelRow seaTunnelRowTransform : seaTunnelRows) {
+                        rows.add(outputManager.convert(seaTunnelRowTransform));
+                    }
                 }
-                seaTunnelRow = outputRowConverter.convert(seaTunnelRow);
-
-                return new GenericRowWithSchema(seaTunnelRow.getFields(), structType);
-            } catch (Exception e) {
-                throw new TaskExecuteException("Row convert failed, caused: " + e.getMessage(), e);
+            } else if (transform instanceof SeaTunnelMapTransform) {
+                SeaTunnelRow seaTunnelRowTransform =
+                        ((SeaTunnelMapTransform<SeaTunnelRow>) transform).map(seaTunnelRow);
+                if (seaTunnelRowTransform != null) {
+                    rows.add(outputManager.convert(seaTunnelRowTransform));
+                }
             }
+            return rows.iterator();
         }
     }
 }

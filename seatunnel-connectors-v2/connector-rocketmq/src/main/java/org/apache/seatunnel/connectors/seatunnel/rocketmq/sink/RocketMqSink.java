@@ -23,7 +23,7 @@ import org.apache.seatunnel.api.common.PrepareFailException;
 import org.apache.seatunnel.api.common.SeaTunnelAPIErrorCode;
 import org.apache.seatunnel.api.sink.SeaTunnelSink;
 import org.apache.seatunnel.api.sink.SinkWriter;
-import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
+import org.apache.seatunnel.api.table.catalog.CatalogTable;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.common.config.CheckConfigUtil;
@@ -39,9 +39,11 @@ import org.apache.seatunnel.connectors.seatunnel.rocketmq.exception.RocketMqConn
 import com.google.auto.service.AutoService;
 
 import java.io.IOException;
+import java.util.Optional;
 
 import static org.apache.seatunnel.connectors.seatunnel.rocketmq.config.Config.ACCESS_KEY;
 import static org.apache.seatunnel.connectors.seatunnel.rocketmq.config.Config.ACL_ENABLED;
+import static org.apache.seatunnel.connectors.seatunnel.rocketmq.config.Config.CONNECTOR_IDENTITY;
 import static org.apache.seatunnel.connectors.seatunnel.rocketmq.config.Config.DEFAULT_FIELD_DELIMITER;
 import static org.apache.seatunnel.connectors.seatunnel.rocketmq.config.Config.FIELD_DELIMITER;
 import static org.apache.seatunnel.connectors.seatunnel.rocketmq.config.Config.FORMAT;
@@ -56,7 +58,7 @@ public class RocketMqSink extends AbstractSimpleSink<SeaTunnelRow, Void> {
 
     @Override
     public String getPluginName() {
-        return "Rocketmq";
+        return CONNECTOR_IDENTITY;
     }
 
     @Override
@@ -73,6 +75,9 @@ public class RocketMqSink extends AbstractSimpleSink<SeaTunnelRow, Void> {
         }
         producerMetadata = new ProducerMetadata();
         producerMetadata.setTopic(config.getString(ProducerConfig.TOPIC.key()));
+        if (config.hasPath(ProducerConfig.TAG.key())) {
+            producerMetadata.setTag(config.getString(ProducerConfig.TAG.key()));
+        }
         RocketMqBaseConfiguration.Builder baseConfigurationBuilder =
                 RocketMqBaseConfiguration.newBuilder()
                         .producer()
@@ -158,13 +163,13 @@ public class RocketMqSink extends AbstractSimpleSink<SeaTunnelRow, Void> {
     }
 
     @Override
-    public SeaTunnelDataType<SeaTunnelRow> getConsumedType() {
-        return this.seaTunnelRowType;
-    }
-
-    @Override
     public AbstractSinkWriter<SeaTunnelRow, Void> createWriter(SinkWriter.Context context)
             throws IOException {
         return new RocketMqSinkWriter(producerMetadata, seaTunnelRowType);
+    }
+
+    @Override
+    public Optional<CatalogTable> getWriteCatalogTable() {
+        return super.getWriteCatalogTable();
     }
 }

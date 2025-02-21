@@ -21,7 +21,9 @@ import org.apache.seatunnel.api.common.metrics.MetricTags;
 import org.apache.seatunnel.api.common.metrics.MetricsContext;
 import org.apache.seatunnel.api.table.type.Record;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
+import org.apache.seatunnel.api.tracing.MDCTracer;
 import org.apache.seatunnel.common.utils.function.ConsumerWithException;
+import org.apache.seatunnel.engine.common.utils.concurrent.CompletableFuture;
 import org.apache.seatunnel.engine.core.checkpoint.InternalCheckpointListener;
 import org.apache.seatunnel.engine.core.dag.actions.Action;
 import org.apache.seatunnel.engine.core.dag.actions.ShuffleAction;
@@ -29,10 +31,13 @@ import org.apache.seatunnel.engine.core.dag.actions.SinkAction;
 import org.apache.seatunnel.engine.core.dag.actions.SourceAction;
 import org.apache.seatunnel.engine.core.dag.actions.TransformChainAction;
 import org.apache.seatunnel.engine.core.dag.actions.UnknownActionException;
+import org.apache.seatunnel.engine.core.job.ConnectorJarIdentifier;
 import org.apache.seatunnel.engine.server.checkpoint.ActionStateKey;
 import org.apache.seatunnel.engine.server.checkpoint.ActionSubtaskState;
 import org.apache.seatunnel.engine.server.checkpoint.CheckpointBarrier;
 import org.apache.seatunnel.engine.server.checkpoint.operation.TaskAcknowledgeOperation;
+import org.apache.seatunnel.engine.server.checkpoint.operation.TriggerSchemaChangeAfterCheckpointOperation;
+import org.apache.seatunnel.engine.server.checkpoint.operation.TriggerSchemaChangeBeforeCheckpointOperation;
 import org.apache.seatunnel.engine.server.dag.physical.config.IntermediateQueueConfig;
 import org.apache.seatunnel.engine.server.dag.physical.config.SinkConfig;
 import org.apache.seatunnel.engine.server.dag.physical.config.SourceConfig;
@@ -59,6 +64,7 @@ import org.apache.seatunnel.engine.server.task.statemachine.SeaTunnelTaskState;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.internal.metrics.MetricDescriptor;
 import com.hazelcast.internal.metrics.MetricsCollectionContext;
+import com.hazelcast.spi.impl.operationservice.impl.InvocationFuture;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 
@@ -70,7 +76,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
@@ -133,7 +138,6 @@ public abstract class SeaTunnelTask extends AbstractTask {
                 .whenComplete((s, e) -> closeCalled = true);
     }
 
-    @SuppressWarnings("checkstyle:MagicNumber")
     protected void stateProcess() throws Exception {
         switch (currState) {
             case INIT:
@@ -288,6 +292,11 @@ public abstract class SeaTunnelTask extends AbstractTask {
         return getFlowInfo((action, set) -> set.addAll(action.getJarUrls()));
     }
 
+    @Override
+    public Set<ConnectorJarIdentifier> getConnectorPluginJars() {
+        return getFlowInfo((action, set) -> set.addAll(action.getConnectorJarIdentifiers()));
+    }
+
     public Set<ActionStateKey> getActionStateKeys() {
         return getFlowInfo((action, set) -> set.add(ActionStateKey.of(action)));
     }
@@ -314,8 +323,7 @@ public abstract class SeaTunnelTask extends AbstractTask {
     @Override
     public void close() throws IOException {
         super.close();
-        allCycles
-                .parallelStream()
+        MDCTracer.tracing(allCycles.parallelStream())
                 .forEach(
                         flowLifeCycle -> {
                             try {
@@ -331,7 +339,8 @@ public abstract class SeaTunnelTask extends AbstractTask {
         Integer ackSize =
                 cycleAcks.compute(barrier.getId(), (id, count) -> count == null ? 1 : ++count);
         if (ackSize == allCycles.size()) {
-            if (barrier.prepareClose()) {
+            cycleAcks.remove(barrier.getId());
+            if (barrier.prepareClose(this.taskLocation)) {
                 this.prepareCloseStatus = true;
                 this.prepareCloseBarrierId.set(barrier.getId());
             }
@@ -341,10 +350,28 @@ public abstract class SeaTunnelTask extends AbstractTask {
                                 new TaskAcknowledgeOperation(
                                         this.taskLocation,
                                         (CheckpointBarrier) barrier,
-                                        checkpointStates.get(barrier.getId())))
+                                        checkpointStates.remove(barrier.getId())))
                         .join();
             }
         }
+    }
+
+    public InvocationFuture<Object> triggerSchemaChangeBeforeCheckpoint() {
+        log.info(
+                "trigger schema-change-before checkpoint. jobID[{}], taskLocation[{}]",
+                jobID,
+                taskLocation);
+        return this.getExecutionContext()
+                .sendToMaster(new TriggerSchemaChangeBeforeCheckpointOperation(taskLocation));
+    }
+
+    public InvocationFuture<Object> triggerSchemaChangeAfterCheckpoint() {
+        log.info(
+                "trigger schema-change-after checkpoint. jobID[{}], taskLocation[{}]",
+                jobID,
+                taskLocation);
+        return this.getExecutionContext()
+                .sendToMaster(new TriggerSchemaChangeAfterCheckpointOperation(taskLocation));
     }
 
     public void addState(Barrier barrier, ActionStateKey stateKey, List<byte[]> state) {
@@ -362,6 +389,12 @@ public abstract class SeaTunnelTask extends AbstractTask {
     @Override
     public void notifyCheckpointAborted(long checkpointId) throws Exception {
         notifyAllAction(listener -> listener.notifyCheckpointAborted(checkpointId));
+        tryClose(checkpointId);
+    }
+
+    @Override
+    public void notifyCheckpointEnd(long checkpointId) throws Exception {
+        notifyAllAction(listener -> listener.notifyCheckpointEnd(checkpointId));
         tryClose(checkpointId);
     }
 

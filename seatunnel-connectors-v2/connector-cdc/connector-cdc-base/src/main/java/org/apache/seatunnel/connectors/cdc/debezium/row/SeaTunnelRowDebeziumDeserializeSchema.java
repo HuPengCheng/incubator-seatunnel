@@ -17,153 +17,243 @@
 
 package org.apache.seatunnel.connectors.cdc.debezium.row;
 
+import org.apache.seatunnel.api.event.EventType;
 import org.apache.seatunnel.api.source.Collector;
+import org.apache.seatunnel.api.table.catalog.CatalogTable;
 import org.apache.seatunnel.api.table.catalog.TablePath;
-import org.apache.seatunnel.api.table.type.MultipleRowType;
+import org.apache.seatunnel.api.table.catalog.TableSchema;
+import org.apache.seatunnel.api.table.schema.event.AlterTableColumnEvent;
+import org.apache.seatunnel.api.table.schema.event.AlterTableColumnsEvent;
+import org.apache.seatunnel.api.table.schema.event.SchemaChangeEvent;
+import org.apache.seatunnel.api.table.schema.handler.TableSchemaChangeEventDispatcher;
+import org.apache.seatunnel.api.table.schema.handler.TableSchemaChangeEventHandler;
+import org.apache.seatunnel.api.table.type.MetadataUtil;
 import org.apache.seatunnel.api.table.type.RowKind;
-import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
-import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
+import org.apache.seatunnel.connectors.cdc.base.schema.SchemaChangeResolver;
+import org.apache.seatunnel.connectors.cdc.base.utils.SourceRecordUtils;
+import org.apache.seatunnel.connectors.cdc.debezium.AbstractDebeziumDeserializationSchema;
 import org.apache.seatunnel.connectors.cdc.debezium.DebeziumDeserializationConverterFactory;
-import org.apache.seatunnel.connectors.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.seatunnel.connectors.cdc.debezium.MetadataConverter;
 
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
-import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.data.Envelope;
+import io.debezium.relational.TableId;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 
-import java.io.Serializable;
 import java.time.ZoneId;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static org.apache.seatunnel.connectors.cdc.base.source.split.wartermark.WatermarkEvent.isSchemaChangeAfterWatermarkEvent;
+import static org.apache.seatunnel.connectors.cdc.base.source.split.wartermark.WatermarkEvent.isSchemaChangeBeforeWatermarkEvent;
 import static org.apache.seatunnel.connectors.cdc.base.utils.SourceRecordUtils.isDataChangeRecord;
+import static org.apache.seatunnel.connectors.cdc.base.utils.SourceRecordUtils.isSchemaChangeEvent;
+import static org.apache.seatunnel.shade.com.google.common.base.Preconditions.checkNotNull;
 
 /** Deserialization schema from Debezium object to {@link SeaTunnelRow}. */
 @Slf4j
 public final class SeaTunnelRowDebeziumDeserializeSchema
-        implements DebeziumDeserializationSchema<SeaTunnelRow> {
+        extends AbstractDebeziumDeserializationSchema<SeaTunnelRow> {
     private static final long serialVersionUID = 1L;
+    private static final String DEFAULT_TABLE_NAME_KEY = null;
 
-    /** TypeInformation of the produced {@link SeaTunnelRow}. * */
-    private final SeaTunnelDataType<SeaTunnelRow> resultTypeInfo;
-
-    /**
-     * Runtime converter that converts Kafka {@link SourceRecord}s into {@link SeaTunnelRow}
-     * consisted of
-     */
-    private final SeaTunnelRowDebeziumDeserializationConverters singleTableRowConverter;
-
-    private final Map<String, SeaTunnelRowDebeziumDeserializationConverters>
-            multipleTableRowConverters;
-
-    /** Validator to validate the row value. */
-    private final ValueValidator validator;
-
-    /** Returns a builder to build {@link SeaTunnelRowDebeziumDeserializeSchema}. */
-    public static Builder builder() {
-        return new Builder();
-    }
+    private final MetadataConverter[] metadataConverters;
+    private final ZoneId serverTimeZone;
+    private final DebeziumDeserializationConverterFactory userDefinedConverterFactory;
+    private final SchemaChangeResolver schemaChangeResolver;
+    private final TableSchemaChangeEventHandler tableSchemaChangeHandler;
+    private List<CatalogTable> tables;
+    private Map<String, SeaTunnelRowDebeziumDeserializationConverters> tableRowConverters;
 
     SeaTunnelRowDebeziumDeserializeSchema(
-            SeaTunnelDataType<SeaTunnelRow> physicalDataType,
             MetadataConverter[] metadataConverters,
-            SeaTunnelDataType<SeaTunnelRow> resultType,
-            ValueValidator validator,
+            List<CatalogTable> tables,
             ZoneId serverTimeZone,
-            DebeziumDeserializationConverterFactory userDefinedConverterFactory) {
-
-        SeaTunnelRowDebeziumDeserializationConverters singleTableRowConverter = null;
-        Map<String, SeaTunnelRowDebeziumDeserializationConverters> multipleTableRowConverters =
-                Collections.emptyMap();
-        if (physicalDataType instanceof MultipleRowType) {
-            multipleTableRowConverters = new HashMap<>();
-            for (Map.Entry<String, SeaTunnelRowType> item : (MultipleRowType) physicalDataType) {
-                SeaTunnelRowDebeziumDeserializationConverters itemRowConverter =
-                        new SeaTunnelRowDebeziumDeserializationConverters(
-                                item.getValue(),
-                                metadataConverters,
-                                serverTimeZone,
-                                userDefinedConverterFactory);
-                multipleTableRowConverters.put(item.getKey(), itemRowConverter);
-            }
-        } else {
-            singleTableRowConverter =
-                    new SeaTunnelRowDebeziumDeserializationConverters(
-                            (SeaTunnelRowType) physicalDataType,
-                            metadataConverters,
-                            serverTimeZone,
-                            userDefinedConverterFactory);
-        }
-        this.singleTableRowConverter = singleTableRowConverter;
-        this.multipleTableRowConverters = multipleTableRowConverters;
-        this.resultTypeInfo = checkNotNull(resultType);
-        this.validator = checkNotNull(validator);
+            DebeziumDeserializationConverterFactory userDefinedConverterFactory,
+            SchemaChangeResolver schemaChangeResolver,
+            Map<TableId, Struct> tableIdTableChangeMap) {
+        super(tableIdTableChangeMap);
+        this.metadataConverters = metadataConverters;
+        this.serverTimeZone = serverTimeZone;
+        this.userDefinedConverterFactory = userDefinedConverterFactory;
+        this.tables = checkNotNull(tables);
+        this.schemaChangeResolver = schemaChangeResolver;
+        this.tableSchemaChangeHandler = new TableSchemaChangeEventDispatcher();
+        this.tableRowConverters =
+                createTableRowConverters(
+                        tables, metadataConverters, serverTimeZone, userDefinedConverterFactory);
     }
 
     @Override
     public void deserialize(SourceRecord record, Collector<SeaTunnelRow> collector)
             throws Exception {
-        if (!isDataChangeRecord(record)) {
-            log.debug("Unsupported record {}, just skip.", record);
+        super.deserialize(record, collector);
+
+        if (isSchemaChangeBeforeWatermarkEvent(record)) {
+            collector.markSchemaChangeBeforeCheckpoint();
+            return;
+        }
+        if (isSchemaChangeAfterWatermarkEvent(record)) {
+            collector.markSchemaChangeAfterCheckpoint();
+            return;
+        }
+        if (isSchemaChangeEvent(record)) {
+            deserializeSchemaChangeRecord(record, collector);
             return;
         }
 
+        if (isDataChangeRecord(record)) {
+            deserializeDataChangeRecord(record, collector);
+            return;
+        }
+
+        log.debug("Unsupported record {}, just skip.", record);
+    }
+
+    private void deserializeSchemaChangeRecord(
+            SourceRecord record, Collector<SeaTunnelRow> collector) {
+        SchemaChangeEvent schemaChangeEvent = null;
+        try {
+            if (schemaChangeResolver != null) {
+                schemaChangeEvent = schemaChangeResolver.resolve(record, null);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to resolve schemaChangeEvent, just skip.", e);
+            return;
+        }
+        if (schemaChangeEvent == null) {
+            log.warn("Unsupported resolve schemaChangeEvent {}, just skip.", record);
+            return;
+        }
+        boolean tableExist = false;
+        for (int i = 0; i < tables.size(); i++) {
+            CatalogTable changeBefore = tables.get(i);
+            if (!schemaChangeEvent.tablePath().equals(changeBefore.getTablePath())) {
+                continue;
+            }
+
+            tableExist = true;
+            log.debug(
+                    "Table[{}] change before: {}",
+                    schemaChangeEvent.tablePath(),
+                    changeBefore.getTableSchema());
+
+            CatalogTable changeAfter = null;
+            if (EventType.SCHEMA_CHANGE_UPDATE_COLUMNS.equals(schemaChangeEvent.getEventType())) {
+                AlterTableColumnsEvent alterTableColumnsEvent =
+                        (AlterTableColumnsEvent) schemaChangeEvent;
+                for (AlterTableColumnEvent event : alterTableColumnsEvent.getEvents()) {
+                    TableSchema changeAfterSchema =
+                            tableSchemaChangeHandler
+                                    .reset(changeBefore.getTableSchema())
+                                    .apply(event);
+                    changeAfter =
+                            CatalogTable.of(
+                                    changeBefore.getTableId(),
+                                    changeAfterSchema,
+                                    changeBefore.getOptions(),
+                                    changeBefore.getPartitionKeys(),
+                                    changeBefore.getComment());
+                    event.setChangeAfter(changeAfter);
+
+                    changeBefore = changeAfter;
+                }
+            } else {
+                TableSchema changeAfterSchema =
+                        tableSchemaChangeHandler
+                                .reset(changeBefore.getTableSchema())
+                                .apply(schemaChangeEvent);
+                changeAfter =
+                        CatalogTable.of(
+                                changeBefore.getTableId(),
+                                changeAfterSchema,
+                                changeBefore.getOptions(),
+                                changeBefore.getPartitionKeys(),
+                                changeBefore.getComment());
+            }
+            tables.set(i, changeAfter);
+            schemaChangeEvent.setChangeAfter(changeAfter);
+            log.debug(
+                    "Table[{}] change after: {}",
+                    schemaChangeEvent.tablePath(),
+                    changeAfter.getTableSchema());
+            break;
+        }
+        if (!tableExist) {
+            log.error(
+                    "Not found table {}, skip schema change event {}",
+                    schemaChangeEvent.tablePath());
+        }
+        tableRowConverters =
+                createTableRowConverters(
+                        tables, metadataConverters, serverTimeZone, userDefinedConverterFactory);
+        collector.collect(schemaChangeEvent);
+    }
+
+    private void deserializeDataChangeRecord(SourceRecord record, Collector<SeaTunnelRow> collector)
+            throws Exception {
         Envelope.Operation operation = Envelope.operationFor(record);
         Struct messageStruct = (Struct) record.value();
         Schema valueSchema = record.valueSchema();
-
-        Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
-        String databaseName = sourceStruct.getString(AbstractSourceInfo.DATABASE_NAME_KEY);
-        String tableName = sourceStruct.getString(AbstractSourceInfo.TABLE_NAME_KEY);
-        String schemaName = null;
-        try {
-            schemaName = sourceStruct.getString(AbstractSourceInfo.SCHEMA_NAME_KEY);
-        } catch (Throwable e) {
-            // ignore
-        }
-        String tableId = TablePath.of(databaseName, schemaName, tableName).toString();
+        TablePath tablePath = SourceRecordUtils.getTablePath(record);
+        String tableId = tablePath.toString();
         SeaTunnelRowDebeziumDeserializationConverters converters;
-        if (!multipleTableRowConverters.isEmpty()) {
-            converters = multipleTableRowConverters.get(tableId);
+        if (tables.size() > 1) {
+            converters = tableRowConverters.get(tableId);
             if (converters == null) {
                 log.debug("Ignore newly added table {}", tableId);
                 return;
             }
         } else {
-            converters = singleTableRowConverter;
+            converters = tableRowConverters.get(DEFAULT_TABLE_NAME_KEY);
         }
-
+        Long fetchTimestamp = SourceRecordUtils.getFetchTimestamp(record);
+        Long messageTimestamp = SourceRecordUtils.getMessageTimestamp(record);
+        long delay = -1L;
+        if (fetchTimestamp != null && messageTimestamp != null) {
+            delay = fetchTimestamp - messageTimestamp;
+        }
         if (operation == Envelope.Operation.CREATE || operation == Envelope.Operation.READ) {
             SeaTunnelRow insert = extractAfterRow(converters, record, messageStruct, valueSchema);
             insert.setRowKind(RowKind.INSERT);
             insert.setTableId(tableId);
-            validator.validate(insert, RowKind.INSERT);
+            MetadataUtil.setDelay(insert, delay);
+            MetadataUtil.setEventTime(insert, fetchTimestamp);
             collector.collect(insert);
         } else if (operation == Envelope.Operation.DELETE) {
             SeaTunnelRow delete = extractBeforeRow(converters, record, messageStruct, valueSchema);
-            validator.validate(delete, RowKind.DELETE);
             delete.setRowKind(RowKind.DELETE);
             delete.setTableId(tableId);
+            MetadataUtil.setDelay(delete, delay);
+            MetadataUtil.setEventTime(delete, fetchTimestamp);
             collector.collect(delete);
-        } else {
+        } else if (operation == Envelope.Operation.UPDATE) {
             SeaTunnelRow before = extractBeforeRow(converters, record, messageStruct, valueSchema);
-            validator.validate(before, RowKind.UPDATE_BEFORE);
             before.setRowKind(RowKind.UPDATE_BEFORE);
             before.setTableId(tableId);
+            MetadataUtil.setDelay(before, delay);
+            MetadataUtil.setEventTime(before, fetchTimestamp);
             collector.collect(before);
 
             SeaTunnelRow after = extractAfterRow(converters, record, messageStruct, valueSchema);
-            validator.validate(after, RowKind.UPDATE_AFTER);
             after.setRowKind(RowKind.UPDATE_AFTER);
             after.setTableId(tableId);
+            MetadataUtil.setDelay(after, delay);
+            MetadataUtil.setEventTime(after, fetchTimestamp);
             collector.collect(after);
+        } else {
+            log.warn("Received {} operation, skip", operation);
         }
     }
 
@@ -192,68 +282,102 @@ public final class SeaTunnelRowDebeziumDeserializeSchema
     }
 
     @Override
-    public SeaTunnelDataType<SeaTunnelRow> getProducedType() {
-        return resultTypeInfo;
+    public List<CatalogTable> getProducedType() {
+        return tables;
     }
 
-    // -------------------------------------------------------------------------------------
-    // Builder
-    // -------------------------------------------------------------------------------------
-
-    /** Custom validator to validate the row value. */
-    public interface ValueValidator extends Serializable {
-        void validate(SeaTunnelRow rowData, RowKind rowKind) throws Exception;
+    @Override
+    public SchemaChangeResolver getSchemaChangeResolver() {
+        return schemaChangeResolver;
     }
 
-    /** Builder of {@link SeaTunnelRowDebeziumDeserializeSchema}. */
+    @Override
+    public void restoreCheckpointProducedType(List<CatalogTable> checkpointDataType) {
+        // If checkpointDataType is null, it indicates that DDL changes are not supported.
+        // Therefore, we need to use the latest table structure to ensure that data from newly added
+        // columns can be parsed correctly.
+        if (schemaChangeResolver == null) {
+            return;
+        }
+
+        Map<TablePath, CatalogTable> latestTableMap =
+                this.tables.stream().collect(Collectors.toMap(CatalogTable::getTablePath, t -> t));
+        Map<TablePath, CatalogTable> restoreTableMap =
+                checkpointDataType.stream()
+                        .collect(Collectors.toMap(CatalogTable::getTablePath, t -> t));
+        for (TablePath tablePath : restoreTableMap.keySet()) {
+            CatalogTable latestTable = latestTableMap.get(tablePath);
+            CatalogTable restoreTable = restoreTableMap.get(tablePath);
+            if (latestTable == null) {
+                log.info("Ignore restore table[{}] has been deleted.", tablePath);
+                continue;
+            }
+
+            log.info("Table[{}] restore before: {}", tablePath, latestTable.getSeaTunnelRowType());
+            latestTableMap.put(tablePath, restoreTable);
+            log.info("Table[{}] restore after: {}", tablePath, restoreTable.getSeaTunnelRowType());
+        }
+        this.tables = new ArrayList<>(latestTableMap.values());
+        this.tableRowConverters =
+                createTableRowConverters(
+                        tables, metadataConverters, serverTimeZone, userDefinedConverterFactory);
+    }
+
+    private static Map<String, SeaTunnelRowDebeziumDeserializationConverters>
+            createTableRowConverters(
+                    List<CatalogTable> tables,
+                    MetadataConverter[] metadataConverters,
+                    ZoneId serverTimeZone,
+                    DebeziumDeserializationConverterFactory userDefinedConverterFactory) {
+        Map<String, SeaTunnelRowDebeziumDeserializationConverters> tableRowConverters =
+                new HashMap<>();
+        if (tables.size() > 1) {
+            for (CatalogTable table : tables) {
+                SeaTunnelRowDebeziumDeserializationConverters itemRowConverter =
+                        new SeaTunnelRowDebeziumDeserializationConverters(
+                                table.getSeaTunnelRowType(),
+                                metadataConverters,
+                                serverTimeZone,
+                                userDefinedConverterFactory);
+                tableRowConverters.put(table.getTablePath().toString(), itemRowConverter);
+            }
+            return tableRowConverters;
+        }
+
+        SeaTunnelRowDebeziumDeserializationConverters tableRowConverter =
+                new SeaTunnelRowDebeziumDeserializationConverters(
+                        tables.get(0).getSeaTunnelRowType(),
+                        metadataConverters,
+                        serverTimeZone,
+                        userDefinedConverterFactory);
+        tableRowConverters.put(DEFAULT_TABLE_NAME_KEY, tableRowConverter);
+        return tableRowConverters;
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    @Setter
+    @Accessors(chain = true)
+    @NoArgsConstructor(access = AccessLevel.PRIVATE)
     public static class Builder {
-        private SeaTunnelDataType<SeaTunnelRow> physicalRowType;
-        private SeaTunnelDataType<SeaTunnelRow> resultTypeInfo;
+        private List<CatalogTable> tables;
         private MetadataConverter[] metadataConverters = new MetadataConverter[0];
-        private ValueValidator validator = (rowData, rowKind) -> {};
-        private ZoneId serverTimeZone = ZoneId.of("UTC");
+        private ZoneId serverTimeZone = ZoneId.systemDefault();
         private DebeziumDeserializationConverterFactory userDefinedConverterFactory =
                 DebeziumDeserializationConverterFactory.DEFAULT;
-
-        public Builder setPhysicalRowType(SeaTunnelDataType<SeaTunnelRow> physicalRowType) {
-            this.physicalRowType = physicalRowType;
-            return this;
-        }
-
-        public Builder setMetadataConverters(MetadataConverter[] metadataConverters) {
-            this.metadataConverters = metadataConverters;
-            return this;
-        }
-
-        public Builder setResultTypeInfo(SeaTunnelDataType<SeaTunnelRow> resultTypeInfo) {
-            this.resultTypeInfo = resultTypeInfo;
-            return this;
-        }
-
-        public Builder setValueValidator(ValueValidator validator) {
-            this.validator = validator;
-            return this;
-        }
-
-        public Builder setServerTimeZone(ZoneId serverTimeZone) {
-            this.serverTimeZone = serverTimeZone;
-            return this;
-        }
-
-        public Builder setUserDefinedConverterFactory(
-                DebeziumDeserializationConverterFactory userDefinedConverterFactory) {
-            this.userDefinedConverterFactory = userDefinedConverterFactory;
-            return this;
-        }
+        private Map<TableId, Struct> tableIdTableChangeMap = new HashMap<>();
+        private SchemaChangeResolver schemaChangeResolver;
 
         public SeaTunnelRowDebeziumDeserializeSchema build() {
             return new SeaTunnelRowDebeziumDeserializeSchema(
-                    physicalRowType,
                     metadataConverters,
-                    resultTypeInfo,
-                    validator,
+                    tables,
                     serverTimeZone,
-                    userDefinedConverterFactory);
+                    userDefinedConverterFactory,
+                    schemaChangeResolver,
+                    tableIdTableChangeMap);
         }
     }
 }

@@ -17,13 +17,20 @@
 
 package org.apache.seatunnel.connectors.cdc.base.source.split;
 
+import org.apache.seatunnel.api.table.catalog.CatalogTable;
+import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.connectors.cdc.base.source.offset.Offset;
 
 import io.debezium.relational.TableId;
 import lombok.Getter;
+import lombok.ToString;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+@ToString
 @Getter
 public class IncrementalSplit extends SourceSplitBase {
     private static final long serialVersionUID = 1L;
@@ -43,16 +50,85 @@ public class IncrementalSplit extends SourceSplitBase {
      */
     private final List<CompletedSnapshotSplitInfo> completedSnapshotSplitInfos;
 
+    // Remove in the next version
+    @Deprecated private SeaTunnelDataType checkpointDataType;
+    private List<CatalogTable> checkpointTables;
+
+    // debezium history table changes
+    private final Map<TableId, byte[]> historyTableChanges;
+
     public IncrementalSplit(
             String splitId,
             List<TableId> capturedTables,
             Offset startupOffset,
             Offset stopOffset,
             List<CompletedSnapshotSplitInfo> completedSnapshotSplitInfos) {
+        this(
+                splitId,
+                capturedTables,
+                startupOffset,
+                stopOffset,
+                completedSnapshotSplitInfos,
+                new ArrayList<>(),
+                new HashMap<>());
+    }
+
+    @Deprecated
+    public IncrementalSplit(IncrementalSplit split, SeaTunnelDataType checkpointDataType) {
+        this(
+                split.splitId(),
+                split.getTableIds(),
+                split.getStartupOffset(),
+                split.getStopOffset(),
+                split.getCompletedSnapshotSplitInfos(),
+                checkpointDataType);
+    }
+
+    public IncrementalSplit(
+            IncrementalSplit split,
+            List<CatalogTable> tables,
+            Map<TableId, byte[]> historyTableChanges) {
+        this(
+                split.splitId(),
+                split.getTableIds(),
+                split.getStartupOffset(),
+                split.getStopOffset(),
+                split.getCompletedSnapshotSplitInfos(),
+                tables,
+                historyTableChanges);
+    }
+
+    @Deprecated
+    public IncrementalSplit(
+            String splitId,
+            List<TableId> capturedTables,
+            Offset startupOffset,
+            Offset stopOffset,
+            List<CompletedSnapshotSplitInfo> completedSnapshotSplitInfos,
+            SeaTunnelDataType checkpointDataType) {
         super(splitId);
         this.tableIds = capturedTables;
         this.startupOffset = startupOffset;
         this.stopOffset = stopOffset;
         this.completedSnapshotSplitInfos = completedSnapshotSplitInfos;
+        this.checkpointDataType = checkpointDataType;
+        this.historyTableChanges = new HashMap<>();
+    }
+
+    public IncrementalSplit(
+            String splitId,
+            List<TableId> capturedTables,
+            Offset startupOffset,
+            Offset stopOffset,
+            List<CompletedSnapshotSplitInfo> completedSnapshotSplitInfos,
+            List<CatalogTable> checkpointTables,
+            Map<TableId, byte[]> historyTableChanges) {
+        super(splitId);
+        this.tableIds = capturedTables;
+        this.startupOffset = startupOffset;
+        this.stopOffset = stopOffset;
+        this.completedSnapshotSplitInfos = completedSnapshotSplitInfos;
+        this.checkpointTables = checkpointTables;
+        this.historyTableChanges = historyTableChanges;
     }
 }

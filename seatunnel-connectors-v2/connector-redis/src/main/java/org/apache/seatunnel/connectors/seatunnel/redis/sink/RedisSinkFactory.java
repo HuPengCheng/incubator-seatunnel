@@ -18,9 +18,14 @@
 package org.apache.seatunnel.connectors.seatunnel.redis.sink;
 
 import org.apache.seatunnel.api.configuration.util.OptionRule;
+import org.apache.seatunnel.api.options.SinkConnectorCommonOptions;
+import org.apache.seatunnel.api.table.catalog.CatalogTable;
+import org.apache.seatunnel.api.table.connector.TableSink;
 import org.apache.seatunnel.api.table.factory.Factory;
 import org.apache.seatunnel.api.table.factory.TableSinkFactory;
-import org.apache.seatunnel.connectors.seatunnel.redis.config.RedisConfig;
+import org.apache.seatunnel.api.table.factory.TableSinkFactoryContext;
+import org.apache.seatunnel.connectors.seatunnel.redis.config.RedisBaseOptions;
+import org.apache.seatunnel.connectors.seatunnel.redis.config.RedisSinkOptions;
 
 import com.google.auto.service.AutoService;
 
@@ -32,17 +37,35 @@ public class RedisSinkFactory implements TableSinkFactory {
     }
 
     @Override
+    public TableSink createSink(TableSinkFactoryContext context) {
+        CatalogTable catalogTable = context.getCatalogTable();
+        return () -> new RedisSink(context.getOptions(), catalogTable);
+    }
+
+    @Override
     public OptionRule optionRule() {
         return OptionRule.builder()
                 .required(
-                        RedisConfig.HOST, RedisConfig.PORT, RedisConfig.KEY, RedisConfig.DATA_TYPE)
+                        RedisBaseOptions.HOST,
+                        RedisBaseOptions.PORT,
+                        RedisBaseOptions.KEY,
+                        RedisBaseOptions.DATA_TYPE)
                 .optional(
-                        RedisConfig.MODE,
-                        RedisConfig.AUTH,
-                        RedisConfig.USER,
-                        RedisConfig.KEY_PATTERN,
-                        RedisConfig.FORMAT)
-                .conditional(RedisConfig.MODE, RedisConfig.RedisMode.CLUSTER, RedisConfig.NODES)
+                        RedisBaseOptions.MODE,
+                        RedisBaseOptions.AUTH,
+                        RedisBaseOptions.USER,
+                        RedisBaseOptions.KEY_PATTERN,
+                        RedisBaseOptions.FORMAT,
+                        RedisSinkOptions.EXPIRE,
+                        RedisSinkOptions.SUPPORT_CUSTOM_KEY,
+                        RedisSinkOptions.VALUE_FIELD,
+                        RedisSinkOptions.HASH_KEY_FIELD,
+                        RedisSinkOptions.HASH_VALUE_FIELD,
+                        SinkConnectorCommonOptions.MULTI_TABLE_SINK_REPLICA)
+                .conditional(
+                        RedisBaseOptions.MODE,
+                        RedisBaseOptions.RedisMode.CLUSTER,
+                        RedisBaseOptions.NODES)
                 .build();
     }
 }

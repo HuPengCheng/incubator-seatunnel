@@ -25,6 +25,7 @@ import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.relational.RelationalTableFilters;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 /**
@@ -41,6 +42,7 @@ public class MySqlSourceConfig extends JdbcSourceConfig {
             List<String> databaseList,
             List<String> tableList,
             int splitSize,
+            Map<String, String> splitColumn,
             double distributionFactorUpper,
             double distributionFactorLower,
             int sampleShardingThreshold,
@@ -56,13 +58,15 @@ public class MySqlSourceConfig extends JdbcSourceConfig {
             String serverTimeZone,
             long connectTimeoutMillis,
             int connectMaxRetries,
-            int connectionPoolSize) {
+            int connectionPoolSize,
+            boolean exactlyOnce) {
         super(
                 startupConfig,
                 stopConfig,
                 databaseList,
                 tableList,
                 splitSize,
+                splitColumn,
                 distributionFactorUpper,
                 distributionFactorLower,
                 sampleShardingThreshold,
@@ -78,7 +82,8 @@ public class MySqlSourceConfig extends JdbcSourceConfig {
                 serverTimeZone,
                 connectTimeoutMillis,
                 connectMaxRetries,
-                connectionPoolSize);
+                connectionPoolSize,
+                exactlyOnce);
     }
 
     @Override

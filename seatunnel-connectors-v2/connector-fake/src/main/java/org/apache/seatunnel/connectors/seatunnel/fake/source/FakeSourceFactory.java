@@ -18,17 +18,23 @@
 package org.apache.seatunnel.connectors.seatunnel.fake.source;
 
 import org.apache.seatunnel.api.configuration.util.OptionRule;
+import org.apache.seatunnel.api.options.ConnectorCommonOptions;
 import org.apache.seatunnel.api.source.SeaTunnelSource;
-import org.apache.seatunnel.api.table.catalog.CatalogTableUtil;
+import org.apache.seatunnel.api.source.SourceSplit;
+import org.apache.seatunnel.api.table.connector.TableSource;
 import org.apache.seatunnel.api.table.factory.Factory;
 import org.apache.seatunnel.api.table.factory.TableSourceFactory;
+import org.apache.seatunnel.api.table.factory.TableSourceFactoryContext;
 import org.apache.seatunnel.connectors.seatunnel.fake.config.FakeOption;
 
 import com.google.auto.service.AutoService;
 
+import java.io.Serializable;
+
 import static org.apache.seatunnel.connectors.seatunnel.fake.config.FakeOption.ARRAY_SIZE;
 import static org.apache.seatunnel.connectors.seatunnel.fake.config.FakeOption.BIGINT_FAKE_MODE;
 import static org.apache.seatunnel.connectors.seatunnel.fake.config.FakeOption.BIGINT_TEMPLATE;
+import static org.apache.seatunnel.connectors.seatunnel.fake.config.FakeOption.BINARY_VECTOR_DIMENSION;
 import static org.apache.seatunnel.connectors.seatunnel.fake.config.FakeOption.BYTES_LENGTH;
 import static org.apache.seatunnel.connectors.seatunnel.fake.config.FakeOption.DATE_DAY_TEMPLATE;
 import static org.apache.seatunnel.connectors.seatunnel.fake.config.FakeOption.DATE_MONTH_TEMPLATE;
@@ -53,6 +59,7 @@ import static org.apache.seatunnel.connectors.seatunnel.fake.config.FakeOption.T
 import static org.apache.seatunnel.connectors.seatunnel.fake.config.FakeOption.TIME_SECOND_TEMPLATE;
 import static org.apache.seatunnel.connectors.seatunnel.fake.config.FakeOption.TINYINT_FAKE_MODE;
 import static org.apache.seatunnel.connectors.seatunnel.fake.config.FakeOption.TINYINT_TEMPLATE;
+import static org.apache.seatunnel.connectors.seatunnel.fake.config.FakeOption.VECTOR_DIMENSION;
 
 @AutoService(Factory.class)
 public class FakeSourceFactory implements TableSourceFactory {
@@ -64,7 +71,8 @@ public class FakeSourceFactory implements TableSourceFactory {
     @Override
     public OptionRule optionRule() {
         return OptionRule.builder()
-                .required(CatalogTableUtil.SCHEMA)
+                .optional(ConnectorCommonOptions.TABLE_CONFIGS)
+                .optional(ConnectorCommonOptions.SCHEMA)
                 .optional(STRING_FAKE_MODE)
                 .conditional(STRING_FAKE_MODE, FakeOption.FakeMode.TEMPLATE, STRING_TEMPLATE)
                 .optional(TINYINT_FAKE_MODE)
@@ -87,6 +95,8 @@ public class FakeSourceFactory implements TableSourceFactory {
                         MAP_SIZE,
                         ARRAY_SIZE,
                         BYTES_LENGTH,
+                        VECTOR_DIMENSION,
+                        BINARY_VECTOR_DIMENSION,
                         DATE_YEAR_TEMPLATE,
                         DATE_MONTH_TEMPLATE,
                         DATE_DAY_TEMPLATE,
@@ -94,6 +104,13 @@ public class FakeSourceFactory implements TableSourceFactory {
                         TIME_MINUTE_TEMPLATE,
                         TIME_SECOND_TEMPLATE)
                 .build();
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T, SplitT extends SourceSplit, StateT extends Serializable>
+            TableSource<T, SplitT, StateT> createSource(TableSourceFactoryContext context) {
+        return () -> (SeaTunnelSource<T, SplitT, StateT>) new FakeSource(context.getOptions());
     }
 
     @Override

@@ -76,7 +76,7 @@ import java.util.stream.Stream;
 
 public class ClickhouseIT extends TestSuiteBase implements TestResource {
     private static final Logger LOG = LoggerFactory.getLogger(ClickhouseIT.class);
-    private static final String CLICKHOUSE_DOCKER_IMAGE = "yandex/clickhouse-server:22.1.3.7";
+    private static final String CLICKHOUSE_DOCKER_IMAGE = "clickhouse/clickhouse-server:23.3.13.6";
     private static final String HOST = "clickhouse";
     private static final String DRIVER_CLASS = "com.clickhouse.jdbc.ClickHouseDriver";
     private static final String INIT_CLICKHOUSE_PATH = "/init/clickhouse_init.conf";
@@ -99,6 +99,100 @@ public class ClickhouseIT extends TestSuiteBase implements TestResource {
         assertHasData(SINK_TABLE);
         compareResult();
         clearSinkTable();
+    }
+
+    @TestTemplate
+    public void testSourceParallelism(TestContainer container) throws Exception {
+        Container.ExecResult execResult = container.executeJob("/clickhouse_to_console.conf");
+        Assertions.assertEquals(0, execResult.getExitCode());
+    }
+
+    @TestTemplate
+    public void testClickhouseWithCreateSchemaWhenComment(TestContainer container)
+            throws Exception {
+        Container.ExecResult execResult =
+                container.executeJob("/clickhouse_with_create_schema_when_comment.conf");
+        Assertions.assertEquals(0, execResult.getExitCode());
+    }
+
+    @TestTemplate
+    public void clickhouseWithCreateSchemaWhenNotExist(TestContainer container) throws Exception {
+        String tableName = "default.sink_table_for_schema";
+        Container.ExecResult execResult =
+                container.executeJob("/clickhouse_with_create_schema_when_not_exist.conf");
+        Assertions.assertEquals(0, execResult.getExitCode());
+        Assertions.assertEquals(100, countData(tableName));
+        execResult = container.executeJob("/clickhouse_with_create_schema_when_not_exist.conf");
+        Assertions.assertEquals(0, execResult.getExitCode());
+        Assertions.assertEquals(200, countData(tableName));
+        dropTable(tableName);
+    }
+
+    @TestTemplate
+    public void clickhouseWithRecreateSchemaAndAppendData(TestContainer container)
+            throws Exception {
+        String tableName = "default.sink_table_for_schema";
+        Container.ExecResult execResult =
+                container.executeJob("/clickhouse_with_recreate_schema_and_append_data.conf");
+        Assertions.assertEquals(0, execResult.getExitCode());
+        Assertions.assertEquals(100, countData(tableName));
+        execResult = container.executeJob("/clickhouse_with_recreate_schema_and_append_data.conf");
+        Assertions.assertEquals(0, execResult.getExitCode());
+        Assertions.assertEquals(100, countData(tableName));
+        dropTable(tableName);
+    }
+
+    @TestTemplate
+    public void clickhouseWithErrorWhenSchemaNotExist(TestContainer container) throws Exception {
+        Container.ExecResult execResult =
+                container.executeJob("/clickhouse_with_error_when_schema_not_exist.conf");
+        Assertions.assertEquals(1, execResult.getExitCode());
+        Assertions.assertTrue(
+                execResult
+                        .getStderr()
+                        .contains(
+                                "ErrorCode:[API-11], ErrorDescription:[The sink table not exist]"));
+    }
+
+    @TestTemplate
+    public void clickhouseWithCreateSchemaWhenNotExistAndDropData(TestContainer container)
+            throws Exception {
+        String tableName = "default.sink_table_for_schema";
+        Container.ExecResult execResult =
+                container.executeJob(
+                        "/clickhouse_with_create_schema_when_not_exist_and_drop_data.conf");
+        Assertions.assertEquals(0, execResult.getExitCode());
+        Assertions.assertEquals(100, countData(tableName));
+        execResult =
+                container.executeJob(
+                        "/clickhouse_with_create_schema_when_not_exist_and_drop_data.conf");
+        Assertions.assertEquals(0, execResult.getExitCode());
+        Assertions.assertEquals(100, countData(tableName));
+        dropTable(tableName);
+    }
+
+    @TestTemplate
+    public void clickhouseWithErrorWhenDataExists(TestContainer container) throws Exception {
+        String tableName = "default.sink_table_for_schema";
+        Container.ExecResult execResult =
+                container.executeJob("/clickhouse_with_error_when_data_exists.conf");
+        Assertions.assertEquals(0, execResult.getExitCode());
+        Assertions.assertEquals(100, countData(tableName));
+        execResult = container.executeJob("/clickhouse_with_error_when_data_exists.conf");
+        Assertions.assertEquals(1, execResult.getExitCode());
+        Assertions.assertTrue(
+                execResult.getStderr().contains("The target data source already has data"));
+        dropTable(tableName);
+    }
+
+    @TestTemplate
+    public void clickhouseRecreateSchemaAndCustom(TestContainer container) throws Exception {
+        String tableName = "default.sink_table_for_schema";
+        Container.ExecResult execResult =
+                container.executeJob("/clickhouse_with_recreate_schema_and_custom.conf");
+        Assertions.assertEquals(0, execResult.getExitCode());
+        Assertions.assertEquals(101, countData(tableName));
+        dropTable(tableName);
     }
 
     @BeforeAll
@@ -186,6 +280,29 @@ public class ClickhouseIT extends TestSuiteBase implements TestResource {
                     "array inject error, not supported data type: " + value.getClass());
         }
         return connection.createArrayOf(sqlType, elements);
+    }
+
+    private int countData(String tableName) {
+        try {
+            String sql = "select count(1) from " + tableName;
+            ResultSet resultSet = this.connection.createStatement().executeQuery(sql);
+            if (resultSet.next()) {
+                return resultSet.getInt(1);
+            } else {
+                return -1;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void dropTable(String tableName) {
+        try {
+            Statement statement = this.connection.createStatement();
+            statement.execute("drop table if exists " + tableName);
+        } catch (SQLException e) {
+            throw new RuntimeException("Drop table failed!", e);
+        }
     }
 
     private void batchInsertData() {
@@ -352,44 +469,45 @@ public class ClickhouseIT extends TestSuiteBase implements TestResource {
     }
 
     private void compareResult() throws SQLException, IOException {
-        String sourceSql = "select * from " + SOURCE_TABLE;
-        String sinkSql = "select * from " + SINK_TABLE;
+        String sourceSql = "select * from " + SOURCE_TABLE + " order by id";
+        String sinkSql = "select * from " + SINK_TABLE + " order by id";
         List<String> columnList =
                 Arrays.stream(generateTestDataSet().getKey().getFieldNames())
                         .collect(Collectors.toList());
-        Statement sourceStatement = connection.createStatement();
-        Statement sinkStatement = connection.createStatement();
-        ResultSet sourceResultSet = sourceStatement.executeQuery(sourceSql);
-        ResultSet sinkResultSet = sinkStatement.executeQuery(sinkSql);
-        Assertions.assertEquals(
-                sourceResultSet.getMetaData().getColumnCount(),
-                sinkResultSet.getMetaData().getColumnCount());
-        while (sourceResultSet.next()) {
-            if (sinkResultSet.next()) {
-                for (String column : columnList) {
-                    Object source = sourceResultSet.getObject(column);
-                    Object sink = sinkResultSet.getObject(column);
-                    if (!Objects.deepEquals(source, sink)) {
-                        InputStream sourceAsciiStream = sourceResultSet.getBinaryStream(column);
-                        InputStream sinkAsciiStream = sinkResultSet.getBinaryStream(column);
-                        String sourceValue =
-                                IOUtils.toString(sourceAsciiStream, StandardCharsets.UTF_8);
-                        String sinkValue =
-                                IOUtils.toString(sinkAsciiStream, StandardCharsets.UTF_8);
-                        Assertions.assertEquals(sourceValue, sinkValue);
+        try (Statement sourceStatement = connection.createStatement();
+                Statement sinkStatement = connection.createStatement();
+                ResultSet sourceResultSet = sourceStatement.executeQuery(sourceSql);
+                ResultSet sinkResultSet = sinkStatement.executeQuery(sinkSql)) {
+            Assertions.assertEquals(
+                    sourceResultSet.getMetaData().getColumnCount(),
+                    sinkResultSet.getMetaData().getColumnCount());
+            while (sourceResultSet.next()) {
+                if (sinkResultSet.next()) {
+                    for (String column : columnList) {
+                        Object source = sourceResultSet.getObject(column);
+                        Object sink = sinkResultSet.getObject(column);
+                        if (!Objects.deepEquals(source, sink)) {
+                            InputStream sourceAsciiStream = sourceResultSet.getBinaryStream(column);
+                            InputStream sinkAsciiStream = sinkResultSet.getBinaryStream(column);
+                            String sourceValue =
+                                    IOUtils.toString(sourceAsciiStream, StandardCharsets.UTF_8);
+                            String sinkValue =
+                                    IOUtils.toString(sinkAsciiStream, StandardCharsets.UTF_8);
+                            Assertions.assertEquals(sourceValue, sinkValue);
+                        }
+                        Assertions.assertTrue(true);
                     }
-                    Assertions.assertTrue(true);
                 }
             }
+            String columns = String.join(",", generateTestDataSet().getKey().getFieldNames());
+            Assertions.assertTrue(
+                    compare(String.format(CONFIG.getString(COMPARE_SQL), columns, columns)));
         }
-        String columns = String.join(",", generateTestDataSet().getKey().getFieldNames());
-        Assertions.assertTrue(
-                compare(String.format(CONFIG.getString(COMPARE_SQL), columns, columns)));
     }
 
     private Boolean compare(String sql) {
-        try (Statement statement = connection.createStatement()) {
-            ResultSet resultSet = statement.executeQuery(sql);
+        try (Statement statement = connection.createStatement();
+                ResultSet resultSet = statement.executeQuery(sql)) {
             return !resultSet.next();
         } catch (SQLException e) {
             throw new RuntimeException("result compare error", e);
@@ -397,9 +515,9 @@ public class ClickhouseIT extends TestSuiteBase implements TestResource {
     }
 
     private void assertHasData(String table) {
-        try (Statement statement = connection.createStatement()) {
-            String sql = String.format("select * from %s.%s limit 1", DATABASE, table);
-            ResultSet source = statement.executeQuery(sql);
+        String sql = String.format("select * from %s.%s limit 1", DATABASE, table);
+        try (Statement statement = connection.createStatement();
+                ResultSet source = statement.executeQuery(sql); ) {
             Assertions.assertTrue(source.next());
         } catch (SQLException e) {
             throw new RuntimeException("test clickhouse server image error", e);

@@ -17,9 +17,6 @@
 
 package org.apache.seatunnel.connectors.seatunnel.assertion.sink;
 
-import org.apache.seatunnel.api.configuration.Option;
-import org.apache.seatunnel.api.configuration.Options;
-
 public class AssertConfig {
 
     public static final String RULE_TYPE = "rule_type";
@@ -38,10 +35,34 @@ public class AssertConfig {
 
     public static final String FIELD_RULES = "field_rules";
 
-    public static final Option<Rules> RULES =
-            Options.key("rules")
-                    .objectType(Rules.class)
-                    .noDefaultValue()
-                    .withDescription(
-                            "Rule definition of user's available data. Each rule represents one field validation or row num validation.");
+    public static final String CATALOG_TABLE_RULES = "catalog_table_rule";
+
+    public static final String PRIMARY_KEY_RULE = "primary_key_rule";
+    public static final String PRIMARY_KEY_NAME = "primary_key_name";
+    public static final String PRIMARY_KEY_COLUMNS = "primary_key_columns";
+
+    public static final String CONSTRAINT_KEY_RULE = "constraint_key_rule";
+    public static final String CONSTRAINT_KEY_NAME = "constraint_key_name";
+    public static final String CONSTRAINT_KEY_TYPE = "constraint_key_type";
+    public static final String CONSTRAINT_KEY_COLUMNS = "constraint_key_columns";
+    public static final String CONSTRAINT_KEY_COLUMN_NAME = "constraint_key_column_name";
+    public static final String CONSTRAINT_KEY_SORT_TYPE = "constraint_key_sort_type";
+
+    public static final String COLUMN_RULE = "column_rule";
+
+    public static final String COLUMN_NAME = "name";
+    public static final String COLUMN_TYPE = "type";
+    public static final String COLUMN_LENGTH = "column_length";
+    public static final String COLUMN_NULLABLE = "nullable";
+    public static final String COLUMN_DEFAULT_VALUE = "default_value";
+    public static final String COLUMN_COMMENT = "comment";
+
+    public static final String TABLE_PATH = "table_path";
+
+    public static class TableIdentifierRule {
+        public static final String TABLE_IDENTIFIER_RULE = "table_identifier_rule";
+
+        public static final String TABLE_IDENTIFIER_CATALOG_NAME = "catalog_name";
+        public static final String TABLE_IDENTIFIER_TABLE_NAME = "table";
+    }
 }
