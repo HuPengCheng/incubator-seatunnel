@@ -17,12 +17,13 @@
 
 package org.apache.seatunnel.core.spark.args;
 
+import org.apache.seatunnel.common.Constants;
 import org.apache.seatunnel.common.config.DeployMode;
 import org.apache.seatunnel.core.base.command.AbstractCommandArgs;
 import org.apache.seatunnel.core.base.command.DeployModeConverter;
 import org.apache.seatunnel.core.base.config.EngineType;
 
-import com.beust.jcommander.Parameter;
+import org.apache.seatunnel.shade.com.beust.jcommander.Parameter;
 
 public class SparkCommandArgs extends AbstractCommandArgs {
 
@@ -36,6 +37,18 @@ public class SparkCommandArgs extends AbstractCommandArgs {
         description = "Spark master",
         required = true)
     private String master = null;
+
+    @Parameter(
+            names = {"-q", "--queue"},
+            description =
+                    "yarn scheduler queue name, default is default")
+    private String queue = "default";
+
+    @Parameter(
+            names = {"-n", "--name"},
+            description =
+                    "yarn application name, default is SeaTunnel")
+    private String appName = Constants.LOGO;
 
     public String getMaster() {
         return master;
@@ -59,4 +72,19 @@ public class SparkCommandArgs extends AbstractCommandArgs {
         this.master = master;
     }
 
+    public String getQueue() {
+        return queue;
+    }
+
+    public void setQueue(String queue) {
+        this.queue = queue;
+    }
+
+    public String getAppName() {
+        return appName;
+    }
+
+    public void setAppName(String appName) {
+        this.appName = appName;
+    }
 }

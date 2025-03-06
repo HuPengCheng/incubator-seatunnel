@@ -22,8 +22,8 @@ import static org.apache.seatunnel.core.flink.constant.FlinkConstant.USAGE_EXIT_
 import org.apache.seatunnel.core.flink.args.FlinkCommandArgs;
 import org.apache.seatunnel.core.flink.config.FlinkJobType;
 
-import com.beust.jcommander.JCommander;
-import com.beust.jcommander.UnixStyleUsageFormatter;
+import org.apache.seatunnel.shade.com.beust.jcommander.JCommander;
+import org.apache.seatunnel.shade.com.beust.jcommander.UnixStyleUsageFormatter;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -28,6 +28,7 @@ import org.apache.seatunnel.common.constants.JobMode;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigFactory;
 
+import org.apache.seatunnel.spark.encrypt.Encryptor;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
@@ -94,6 +95,7 @@ public class SparkEnvironment implements RuntimeEnv {
         // TODO we use --jar parameter to support submit multi-jar in spark cluster at now. Refactor it to
         //  support submit multi-jar in code or remove this logic.
         // this.sparkSession.conf().set("spark.jars",pluginPaths.stream().map(URL::getPath).collect(Collectors.joining(",")));
+        Encryptor.registerUdf(sparkSession);
     }
 
     @Override

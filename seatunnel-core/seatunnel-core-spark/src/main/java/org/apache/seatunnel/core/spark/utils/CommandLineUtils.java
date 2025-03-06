@@ -19,7 +19,7 @@ package org.apache.seatunnel.core.spark.utils;
 
 import org.apache.seatunnel.core.spark.args.SparkCommandArgs;
 
-import com.beust.jcommander.JCommander;
+import org.apache.seatunnel.shade.com.beust.jcommander.JCommander;
 
 public class CommandLineUtils {
 

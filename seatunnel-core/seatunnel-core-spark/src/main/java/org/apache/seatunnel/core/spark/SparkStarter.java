@@ -33,10 +33,10 @@ import org.apache.seatunnel.plugin.discovery.PluginIdentifier;
 import org.apache.seatunnel.plugin.discovery.spark.SparkSinkPluginDiscovery;
 import org.apache.seatunnel.plugin.discovery.spark.SparkSourcePluginDiscovery;
 
+import org.apache.seatunnel.shade.com.beust.jcommander.JCommander;
+import org.apache.seatunnel.shade.com.beust.jcommander.UnixStyleUsageFormatter;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
-import com.beust.jcommander.JCommander;
-import com.beust.jcommander.UnixStyleUsageFormatter;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.File;
@@ -230,9 +230,16 @@ public class SparkStarter implements Starter {
         List<String> commands = new ArrayList<>();
         commands.add("${SPARK_HOME}/bin/spark-submit");
         appendOption(commands, "--class", SeatunnelSpark.class.getName());
-        appendOption(commands, "--name", this.appName);
+        String appName = this.appName;
+        if (Constants.LOGO.equalsIgnoreCase(appName)) {
+            appName = this.commandArgs.getAppName();
+        }
+        appendOption(commands, "--name", appName);
         appendOption(commands, "--master", this.commandArgs.getMaster());
         appendOption(commands, "--deploy-mode", this.commandArgs.getDeployMode().getName());
+        if ("yarn".equalsIgnoreCase(this.commandArgs.getMaster())) {
+            appendOption(commands, "--queue", this.commandArgs.getQueue());
+        }
         appendJars(commands, this.jars);
         appendFiles(commands, this.files);
         appendSparkConf(commands, this.sparkConf);

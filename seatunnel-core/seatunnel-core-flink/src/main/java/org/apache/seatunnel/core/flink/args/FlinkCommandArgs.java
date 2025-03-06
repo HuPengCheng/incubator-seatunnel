@@ -22,8 +22,8 @@ import org.apache.seatunnel.core.base.command.AbstractCommandArgs;
 import org.apache.seatunnel.core.base.config.EngineType;
 import org.apache.seatunnel.core.flink.config.FlinkRunMode;
 
-import com.beust.jcommander.IStringConverter;
-import com.beust.jcommander.Parameter;
+import org.apache.seatunnel.shade.com.beust.jcommander.IStringConverter;
+import org.apache.seatunnel.shade.com.beust.jcommander.Parameter;
 
 import java.util.List;
 

@@ -55,8 +55,8 @@
         </dependency>
 
         <dependency>
-            <groupId>com.beust</groupId>
-            <artifactId>jcommander</artifactId>
+            <groupId>org.apache.seatunnel</groupId>
+            <artifactId>seatunnel-jcommander</artifactId>
         </dependency>
 
         <dependency>

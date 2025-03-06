@@ -19,7 +19,8 @@ package org.apache.seatunnel.core.spark.args;
 
 import org.apache.seatunnel.common.config.DeployMode;
 
-import com.beust.jcommander.JCommander;
+import org.apache.seatunnel.shade.com.beust.jcommander.JCommander;
+
 import org.junit.Assert;
 import org.junit.Test;
 

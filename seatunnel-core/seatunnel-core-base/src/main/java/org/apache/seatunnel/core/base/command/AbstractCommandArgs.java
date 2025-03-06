@@ -21,7 +21,7 @@ import org.apache.seatunnel.apis.base.command.CommandArgs;
 import org.apache.seatunnel.common.config.DeployMode;
 import org.apache.seatunnel.core.base.config.EngineType;
 
-import com.beust.jcommander.Parameter;
+import org.apache.seatunnel.shade.com.beust.jcommander.Parameter;
 
 import java.util.Collections;
 import java.util.List;

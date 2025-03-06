@@ -17,7 +17,8 @@
 
 package org.apache.seatunnel.core.flink;
 
-import com.beust.jcommander.ParameterException;
+import org.apache.seatunnel.shade.com.beust.jcommander.ParameterException;
+
 import org.junit.Assert;
 import org.junit.Test;
 

@@ -101,7 +101,7 @@
         <neo4j.connector.spark.version>4.1.0</neo4j.connector.spark.version>
         <iceberg.version>0.13.1</iceberg.version>
         <flink.version>1.13.6</flink.version>
-        <hudi.version>0.10.0</hudi.version>
+        <hudi.version>0.5.2-incubating</hudi.version>
         <hadoop.binary.version>2.7</hadoop.binary.version>
         <hadoop.version>2.7.5</hadoop.version>
         <jackson.version>2.12.6</jackson.version>
@@ -147,7 +147,6 @@
         <exec-maven-plugin.version>3.0.0</exec-maven-plugin.version>
         <docker.hub>apache</docker.hub>
         <docker.tag>${project.version}</docker.tag>
-        <jcommander.version>1.81</jcommander.version>
         <junit.version>4.13.2</junit.version>
         <tispark.version>2.4.1</tispark.version>
         <druid.version>0.22.1</druid.version>
@@ -473,6 +472,12 @@
             </dependency>
 
             <dependency>
+                <groupId>org.apache.hudi</groupId>
+                <artifactId>hudi-utilities_${scala.binary.version}</artifactId>
+                <version>${hudi.version}</version>
+            </dependency>
+
+            <dependency>
                 <groupId>org.apache.httpcomponents</groupId>
                 <artifactId>httpclient</artifactId>
                 <version>${httpclient.version}</version>
@@ -496,9 +501,15 @@
             </dependency>
 
             <dependency>
-                <groupId>com.beust</groupId>
-                <artifactId>jcommander</artifactId>
-                <version>${jcommander.version}</version>
+                <groupId>org.apache.seatunnel</groupId>
+                <artifactId>seatunnel-jcommander</artifactId>
+                <version>2.1.4-SNAPSHOT</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>com.beust</groupId>
+                        <artifactId>jcommander</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
 
             <dependency>

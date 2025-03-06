@@ -19,8 +19,8 @@ package org.apache.seatunnel.core.base.command;
 
 import org.apache.seatunnel.common.config.DeployMode;
 
-import com.beust.jcommander.IStringConverter;
-import com.beust.jcommander.ParameterException;
+import org.apache.seatunnel.shade.com.beust.jcommander.IStringConverter;
+import org.apache.seatunnel.shade.com.beust.jcommander.ParameterException;
 
 import java.util.Optional;
 

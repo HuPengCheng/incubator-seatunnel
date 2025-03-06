@@ -41,7 +41,7 @@ class Jdbc extends SparkBatchSource {
     val reader = sparkSession.read
       .format("jdbc")
       .option("url", config.getString("url"))
-      .option("dbtable", config.getString("table"))
+      .option("dbtable", getDbTable)
       .option("user", config.getString("user"))
       .option("password", config.getString("password"))
       .option("driver", driver)
@@ -64,6 +64,17 @@ class Jdbc extends SparkBatchSource {
     }
 
     reader
+  }
+
+  private def getDbTable = {
+    val table = config.getString("table")
+    val lowerTable = table.toLowerCase
+    // 如果是select语句，则拼接成(sql) t,否则直接返回
+    if (lowerTable.contains("select") && lowerTable.contains("from")) {
+      s"(${table}) t"
+    } else {
+      table
+    }
   }
 
   override def getPluginName: String = "Jdbc"

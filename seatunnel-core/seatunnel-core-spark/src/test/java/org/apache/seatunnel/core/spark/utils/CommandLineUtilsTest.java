@@ -19,7 +19,8 @@ package org.apache.seatunnel.core.spark.utils;
 
 import org.apache.seatunnel.core.spark.args.SparkCommandArgs;
 
-import com.beust.jcommander.ParameterException;
+import org.apache.seatunnel.shade.com.beust.jcommander.ParameterException;
+
 import org.junit.Assert;
 import org.junit.Test;
 

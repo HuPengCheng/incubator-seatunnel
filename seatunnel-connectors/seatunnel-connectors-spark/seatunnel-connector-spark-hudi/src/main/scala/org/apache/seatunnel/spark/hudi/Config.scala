@@ -45,4 +45,27 @@ object Config extends Serializable {
    * Hoodie data store read paths
    */
   val HOODIE_DATASTORE_READ_PATHS = "hoodie.datasource.read.paths"
+
+  /**
+   * ETL专属业务属性
+   */
+  /**
+   * 是否加密
+   */
+  val IS_ENCRYPT = "is.encrypt"
+
+  /**
+   * 是否需要删除`\t|\n|\r|\01`等特殊字符
+   */
+  val NEED_DROP_DELIMS = "need_drop_delims"
+
+  /**
+   * 删除方式，0 - 全删，1 - 按task.id删除
+   */
+  val DROP_MODE = "drop.mode"
+
+  /**
+   * 任务id
+   */
+  val TASK_ID = "task.id"
 }
