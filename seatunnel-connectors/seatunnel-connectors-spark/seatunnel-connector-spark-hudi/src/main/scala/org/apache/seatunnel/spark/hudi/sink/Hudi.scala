@@ -110,7 +110,7 @@ class Hudi extends SparkBatchSink {
       false
     }
     // 类型处理
-    var result = TypeCleaner.clean(dataframe)
+    var result = TypeCleaner.clean(environment.getSparkSession, dataframe)
     // 清理表中`\t|\n|\r|\01`等特殊字符
     result = FieldFormatter.strDropDelims(environment.getSparkSession, result, needDropDelims)
 //    result = Encryptor.encrypt(environment.getSparkSession, result, isEncrypt)
