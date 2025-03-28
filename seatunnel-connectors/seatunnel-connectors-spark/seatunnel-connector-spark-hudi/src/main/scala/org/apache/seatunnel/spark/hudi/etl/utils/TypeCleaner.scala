@@ -52,11 +52,14 @@ object TypeCleaner {
         registerUdf(sparkSession)
         val func = "cast_format"
         dataframe.selectExpr(dataframe.schema.fields.map(field => {
-            field.dataType.typeName match  {
-                case "date" | "timestamp"
-                    => s"(${func}_${field.dataType.simpleString}(${field.name},'string', true) ) AS ${field.name}"
-                case "decimal" => s"(${func}_${field.dataType.simpleString}(${field.name},'double', true) ) AS ${field.name}"
-                case _ => field.name
+            val targetFieldName = field.name.toLowerCase
+            val fieldTypeName = field.dataType.typeName.toLowerCase
+            if (fieldTypeName.equals("date") || fieldTypeName.equals("timestamp")) {
+                s"(${func}_string(${field.name},'${field.dataType.simpleString}', true) ) AS ${targetFieldName}"
+            } else if (fieldTypeName.startsWith("decimal")) {
+                s"(${func}_double(${field.name},'${field.dataType.simpleString}', true) ) AS ${targetFieldName}"
+            } else {
+                targetFieldName
             }
         }): _*)
     }
@@ -102,7 +105,7 @@ object TypeCleaner {
     }
 
 
-    private def registerUdf(sparkSession: SparkSession) = {
+    def registerUdf(sparkSession: SparkSession) = {
 
         val cast_format_sequence = (value: Any, typeInfo: String, isFillDefault: Boolean) => {
             val parser: TypeParser = new TypeParser()

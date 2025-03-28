@@ -19,7 +19,7 @@ object FieldFormatter {
 
     def dropDelimsSql(sparkSession: SparkSession, dataframe: DataFrame, needDropDelims: Boolean): DataFrame = {
         if (!needDropDelims) {
-            dataframe
+            return dataframe
         }
         val clearFunName = "drop_import_delims"
         val tablename = "drop_import_delims_" + System.currentTimeMillis()
@@ -48,9 +48,19 @@ object FieldFormatter {
     }
 
     private def getDropSql(sparkSession: SparkSession, dataframe: DataFrame, func: String, tableName: String): String = {
-
-        val newColnums = dataframe.schema.fieldNames.map(col => {
-            s"${func}($col) AS $col"
+        TypeCleaner.registerUdf(sparkSession)
+        val newColnums = dataframe.schema.fields.map(field => {
+            val targetFieldName = field.name.toLowerCase
+            val fieldType = field.dataType.typeName.toLowerCase
+            if (fieldType.equals("date") || fieldType.equals("timestamp")) {
+                s"(cast_format_string(${field.name},'${field.dataType.simpleString}', true) ) AS $targetFieldName"
+            } else if (fieldType.startsWith("decimal")) {
+                s"(cast_format_double(${field.name},'decimal', true) ) AS $targetFieldName"
+            } else if (fieldType.equals("string")) {
+                s"${func}(${field.name}) AS $targetFieldName"
+            } else {
+                s"${field.name} AS $targetFieldName"
+            }
         })
         /*val newColnums = colnameTypes.asScala.map(col => {
             val colnum = col._1
