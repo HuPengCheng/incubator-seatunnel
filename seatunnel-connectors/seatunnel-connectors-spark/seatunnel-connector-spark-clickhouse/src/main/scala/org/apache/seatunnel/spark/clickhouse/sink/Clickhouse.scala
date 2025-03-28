@@ -34,12 +34,14 @@ import org.apache.seatunnel.common.config.TypesafeConfigUtils.{extractSubConfig,
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigFactory
 import org.apache.seatunnel.spark.SparkEnvironment
 import org.apache.seatunnel.spark.batch.SparkBatchSink
-import org.apache.seatunnel.spark.clickhouse.Config.{BULK_SIZE, DATABASE, FIELDS, HOST, PASSWORD, RETRY, RETRY_CODES, SHARDING_KEY, SPLIT_MODE, TABLE, USERNAME}
+import org.apache.seatunnel.spark.clickhouse.Config.{BULK_SIZE, DATABASE, DROP_MODE, FIELDS, HOST, PASSWORD, RETRY, RETRY_CODES, SHARDING_KEY, SPLIT_MODE, TABLE, TASK_ID, USERNAME}
 import org.apache.seatunnel.spark.clickhouse.sink.Clickhouse.{Shard, acceptedClickHouseSchema, distributedEngine, getClickHouseDistributedTable, getClickHouseSchema, getClickhouseConnection, getClusterShardList, getDefaultValue, getRowShard, parseHost}
-import org.apache.spark.sql.{Dataset, Row}
+import org.apache.spark.sql.functions.lit
+import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import ru.yandex.clickhouse.{BalancedClickhouseDataSource, ClickHouseArray, ClickHouseConnectionImpl, ClickHousePreparedStatementImpl}
 import ru.yandex.clickhouse.except.ClickHouseException
 import ru.yandex.clickhouse.domain.ClickHouseDataType
+
 import java.nio.ByteBuffer
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.AtomicLong
@@ -66,19 +68,22 @@ class Clickhouse extends SparkBatchSink {
   private var shardKeyType: String = _
   private var shardTable: String = _
   private var shardWeightCount = 0
+  private val ETL_TASK_ID = "ETLTASKID"
   // used for split mode end
 
 
   override def output(data: Dataset[Row], environment: SparkEnvironment): Unit = {
-    val dfFields = data.schema.fieldNames
+    val dataFrame = fillTaskId(data.toDF())
+    val dfFields = dataFrame.schema.fieldNames
     val bulkSize = config.getInt(BULK_SIZE)
     val retry = config.getInt(RETRY)
 
     if (!config.hasPath(FIELDS)) {
-      fields = dfFields.toList
-      initSQL = initPrepareSQL()
+      val tableColumnSet = tableSchema.keySet.map(c => c.toLowerCase)
+      fields = dataFrame.schema.fields.filter(f => tableColumnSet.contains(f.name.toLowerCase)).map(f => f.name).toList
     }
-    data.foreachPartition { iter: Iterator[Row] =>
+    initSQL = initPrepareSQL()
+    dataFrame.foreachPartition { iter: Iterator[Row] =>
 
       val statementMap = this.shards.map(s => {
         // if use splitMode, jdbcUrl should use the shard itself url, or else should use multiHosts
@@ -115,6 +120,14 @@ class Clickhouse extends SparkBatchSink {
     }
   }
 
+  private def fillTaskId(df: DataFrame) = {
+    if (config.hasPath(TASK_ID) && config.hasPath(DROP_MODE)) {
+      df.withColumn(ETL_TASK_ID, lit(config.getString(TASK_ID)))
+    } else {
+      df
+    }
+  }
+
   override def checkConfig(): CheckResult = {
     var checkResult = checkAllExists(config, HOST, TABLE, DATABASE, USERNAME, PASSWORD)
     if (checkResult.isSuccess) {
@@ -136,6 +149,7 @@ class Clickhouse extends SparkBatchSink {
       val conn = getClickhouseConnection(multiHosts, database, properties)
       this.table = config.getString(TABLE)
       this.tableSchema = getClickHouseSchema(conn, this.table).toMap
+      tablePrepare(conn)
       if (splitMode) {
         val tableName = config.getString(TABLE)
         val localTable = getClickHouseDistributedTable(conn, database, tableName)
@@ -188,6 +202,32 @@ class Clickhouse extends SparkBatchSink {
         RETRY -> 1))
     config = config.withFallback(defaultConfig)
     retryCodes = config.getIntList(RETRY_CODES)
+  }
+
+  private def tablePrepare(conn: ClickHouseConnectionImpl): Unit = {
+    if (config.hasPath(DROP_MODE)) {
+      if ("1".equals(config.getString(DROP_MODE))) {
+        // 基于taskid删除
+        if (tableSchema.keySet.map(c => c.toLowerCase).contains(ETL_TASK_ID.toLowerCase)) {
+          val deleteSql = s"ALTER TABLE ${config.getString(DATABASE)}.${config.getString(TABLE)} DELETE WHERE ${ETL_TASK_ID} = '${config.getString(TASK_ID)}'"
+          val optSql = s"OPTIMIZE TABLE ${config.getString(DATABASE)}.${config.getString(TABLE)} FINAL"
+          conn.createStatement().execute(deleteSql)
+          conn.createStatement().execute(optSql)
+        } else {
+          println("Can't find  ETLTASKID")
+        }
+      } else if ("0".equals(config.getString(DROP_MODE))) {
+        try {
+          val deleteSql = s"truncate table if exists ${config.getString(DATABASE)}.${config.getString(TABLE)}"
+          conn.createStatement().execute(deleteSql)
+        } catch {
+          case e: Exception =>
+            e.printStackTrace()
+        }
+      } else {
+        println("Dont delete!!!")
+      }
+    }
   }
 
 

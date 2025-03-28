@@ -24,6 +24,7 @@ import org.apache.seatunnel.shade.com.typesafe.config.ConfigFactory;
 
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
+import org.apache.spark.sql.functions;
 
 /**
  * a base interface indicates a sink plugin running on Spark.
@@ -43,4 +44,20 @@ public abstract class BaseSparkSink<OUT> implements BaseSink<SparkEnvironment> {
     }
 
     public abstract OUT output(Dataset<Row> data, SparkEnvironment env);
+
+    /**
+     * 删除老数据，保证任务幂等执行
+     * @param env spark运行环境
+     */
+    public void cleanOldDataInSink(SparkEnvironment env) {
+        // doThing
+    }
+
+    public Dataset<Row> cleanDataset(Dataset<Row> data, SparkEnvironment env) {
+        if (config.hasPath(CONFIG_DROP_MODE) && 1 == config.getInt(CONFIG_DROP_MODE)) {
+            return data.withColumn(FIELD_ETL_TASK_ID, config.hasPath(CONFIG_TASK_ID) ? functions.lit(config.getString(CONFIG_TASK_ID)) : functions.lit(null).cast("string"));
+        }
+        cleanOldDataInSink(env);
+        return data;
+    }
 }

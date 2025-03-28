@@ -43,6 +43,9 @@ import java.io.Serializable;
 public interface Plugin<T extends RuntimeEnv> extends Serializable, AutoCloseable {
     String RESULT_TABLE_NAME = "result_table_name";
     String SOURCE_TABLE_NAME = "source_table_name";
+    String CONFIG_DROP_MODE = "drop.mode";
+    String CONFIG_TASK_ID = "task.id";
+    String FIELD_ETL_TASK_ID = "ETLTASKID";
 
     void setConfig(Config config);
 

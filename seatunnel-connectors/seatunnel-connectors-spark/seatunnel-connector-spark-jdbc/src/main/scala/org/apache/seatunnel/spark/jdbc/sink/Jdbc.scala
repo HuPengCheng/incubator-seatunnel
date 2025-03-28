@@ -17,14 +17,15 @@
 package org.apache.seatunnel.spark.jdbc.sink
 
 import scala.collection.JavaConversions._
-
 import org.apache.seatunnel.common.config.CheckConfigUtil.checkAllExists
 import org.apache.seatunnel.common.config.CheckResult
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigFactory
 import org.apache.seatunnel.spark.SparkEnvironment
 import org.apache.seatunnel.spark.batch.SparkBatchSink
 import org.apache.spark.sql.{Dataset, Row}
-import org.apache.spark.sql.execution.datasources.jdbc2.JDBCSaveMode
+import org.apache.spark.sql.execution.datasources.jdbc2.{JDBCSaveMode, JdbcOptionsInWrite, JdbcUtils}
+
+import java.sql.SQLException
 
 class Jdbc extends SparkBatchSink {
 
@@ -70,6 +71,45 @@ class Jdbc extends SparkBatchSink {
         "customUpdateStmt" -> "",
         "duplicateIncs" -> ""))
     config = config.withFallback(defaultConfig)
+  }
+
+  /**
+   * 删除老数据，保证任务幂等执行
+   *
+   * @param env spark运行环境
+   */
+  override def cleanOldDataInSink(env: SparkEnvironment): Unit = {
+    super.cleanOldDataInSink(env)
+    val parameters: Map[String, String] = config.root().unwrapped().toMap.map {
+      case (k, v) => k -> v.toString
+    }
+    val jdbcOptions = new JdbcOptionsInWrite(parameters), parameters
+    val sql = if ("0" == parameters("drop.mode")) {
+      // truncate table
+      s"truncate table ${parameters("dbTable")}"
+    } else if ("1" == parameters("drop.mode")) {
+      // delete by etltaskid
+      s"delete from ${parameters("dbTable")} where ETLTASKID = '${parameters("task.id")}'"
+    } else {
+      // do nothing
+      return
+    }
+    val conn = JdbcUtils.createConnectionFactory(jdbcOptions)()
+    try {
+      val stmt = conn.createStatement()
+      try {
+        println("clean data sql: " + sql)
+        stmt.execute(sql)
+      } catch {
+        case e: SQLException => e.printStackTrace()
+      } finally {
+        stmt.close()
+      }
+    } catch {
+      case e: SQLException => e.printStackTrace()
+    } finally {
+      conn.close()
+    }
   }
 
   override def getPluginName: String = "Jdbc"

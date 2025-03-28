@@ -178,6 +178,7 @@ public class SparkEnvironment implements RuntimeEnv {
         } else {
             fromDs = ds;
         }
+        fromDs = sink.cleanDataset(fromDs, environment);
         return sink.output(fromDs, environment);
     }
 }

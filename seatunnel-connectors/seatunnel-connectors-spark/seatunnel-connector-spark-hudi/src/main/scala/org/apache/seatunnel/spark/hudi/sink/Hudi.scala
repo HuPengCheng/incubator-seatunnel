@@ -51,10 +51,15 @@ class Hudi extends SparkBatchSink {
       Map(
         SAVE_MODE -> DEFAULT_SAVE_MODE))
     config = config.withFallback(defaultConfig)
-    tablePrepare(env)
   }
 
-  private def tablePrepare(env: SparkEnvironment): Unit = {
+  /**
+   * 删除老数据，保证任务幂等执行
+   *
+   * @param env spark运行环境
+   */
+  override def cleanOldDataInSink(env: SparkEnvironment): Unit = {
+    super.cleanOldDataInSink(env)
     val basePath = getBasePath
     val hdfs = getHdfs(basePath)
     if (hdfs.exists(new Path(basePath)) && config.hasPath(DROP_MODE)) {
@@ -90,7 +95,6 @@ class Hudi extends SparkBatchSink {
   override def output(df: Dataset[Row], environment: SparkEnvironment): Unit = {
     var dataframe = df.toDF()
     dataframe = cleanDf(dataframe, environment)
-    dataframe.printSchema()
     dataframe.explain(true)
     val writer = dataframe.write.format("hudi")
     fillProperties(writer)
@@ -99,34 +103,24 @@ class Hudi extends SparkBatchSink {
   }
 
   private def cleanDf(dataframe: DataFrame, environment: SparkEnvironment): DataFrame = {
-    val needDropDelims = if (config.hasPath(NEED_DROP_DELIMS)) {
-      config.getBoolean(NEED_DROP_DELIMS)
-    } else {
-      false
-    }
-    val isEncrypt = if (config.hasPath(IS_ENCRYPT)) {
-      config.getBoolean(IS_ENCRYPT)
-    } else {
-      false
-    }
-    // 类型处理
-    var result = TypeCleaner.clean(environment.getSparkSession, dataframe)
+    println("========cleanDf start==================")
+    dataframe.printSchema()
+//    val needDropDelims = if (config.hasPath(NEED_DROP_DELIMS)) {
+//      config.getBoolean(NEED_DROP_DELIMS)
+//    } else {
+//      false
+//    }
+//    val isEncrypt = if (config.hasPath(IS_ENCRYPT)) {
+//      config.getBoolean(IS_ENCRYPT)
+//    } else {
+//      false
+//    }
     // 清理表中`\t|\n|\r|\01`等特殊字符
-    result = FieldFormatter.strDropDelims(environment.getSparkSession, result, needDropDelims)
+    val dropDf = FieldFormatter.strDropDelims(environment.getSparkSession, dataframe, true)
 //    result = Encryptor.encrypt(environment.getSparkSession, result, isEncrypt)
-    result = fillTaskId(result)
-    if (config.hasPath(DROP_MODE)) {
-      result = result.withColumn(ETL_TASK_ID, lit(if(config.hasPath(TASK_ID)) config.getString(TASK_ID) else null).cast("string"))
-    }
-    result
-  }
-
-  private def fillTaskId(df: DataFrame) = {
-    if (config.hasPath(TASK_ID) && config.hasPath(DROP_MODE)) {
-      df.withColumn(ETL_TASK_ID, lit(config.getString(TASK_ID)))
-    } else {
-      df
-    }
+    println("========cleanDf end==================")
+    dropDf.printSchema()
+    dropDf
   }
 
   private def fillProperties(writer: DataFrameWriter[Row]): Unit = {

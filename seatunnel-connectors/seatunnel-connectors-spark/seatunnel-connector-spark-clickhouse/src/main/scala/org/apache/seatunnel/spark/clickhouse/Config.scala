@@ -106,4 +106,14 @@ object Config extends Serializable {
    * The address of Clickhouse server node
    */
   val NODE_ADDRESS = "node_address"
+
+  /**
+   * 删除方式，0 - 全删，1 - 按task.id删除
+   */
+  val DROP_MODE = "drop.mode"
+
+  /**
+   * 任务id
+   */
+  val TASK_ID = "task.id"
 }
