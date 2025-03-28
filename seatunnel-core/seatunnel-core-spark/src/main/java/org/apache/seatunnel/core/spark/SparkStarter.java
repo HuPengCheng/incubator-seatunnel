@@ -180,6 +180,8 @@ public class SparkStarter implements Starter {
             this.sparkConf.put("spark.driver.extraJavaOptions", driverJavaOpts.trim());
             this.sparkConf.put("spark.executor.extraJavaOptions", executorJavaOpts.trim());
         }
+        this.sparkConf.put("spark.yarn.keytab", System.getenv("SPARK_YARN_KEYTAB"));
+        this.sparkConf.put("spark.yarn.principal", System.getenv("SPARK_YARN_PRINCIPAL"));
     }
 
     /**
