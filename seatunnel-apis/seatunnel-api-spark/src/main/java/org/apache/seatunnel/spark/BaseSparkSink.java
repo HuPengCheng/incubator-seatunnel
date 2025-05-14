@@ -26,6 +26,8 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.functions;
 
+import java.util.List;
+
 /**
  * a base interface indicates a sink plugin running on Spark.
  */
@@ -51,11 +53,47 @@ public abstract class BaseSparkSink<OUT> implements BaseSink<SparkEnvironment> {
      */
     public void cleanOldDataInSink(SparkEnvironment env) {
         // doThing
+        System.out.println("start clean old data in sink");
+        if (config.hasPath(CONFIG_DROP_MODE)) {
+            System.out.println("config drop mode is " + config.getInt(CONFIG_DROP_MODE));
+            if (config.getInt(CONFIG_DROP_MODE) == 0) {
+                cleanAllDataInSink(env);
+            } else if (config.getInt(CONFIG_DROP_MODE) == 1) {
+                cleanDataByEtlIdInSink(env);
+            }
+            return;
+        }
+        // 按分区清理
+        if (config.hasPath(PARTITION_BY)) {
+            cleanDataByPartitionInSink(env, config.getStringList(PARTITION_BY));
+        }
     }
 
+    public void cleanAllDataInSink(SparkEnvironment env) {
+        System.out.println("clean all data in sink");
+    }
+
+    public void cleanDataByEtlIdInSink(SparkEnvironment env) {
+        System.out.println("clean data by etl id in sink");
+    }
+
+    public void cleanDataByPartitionInSink(SparkEnvironment env, List<String> stringList) {
+        System.out.println("clean data by partition in sink");
+    }
+
+
+
     public Dataset<Row> cleanDataset(Dataset<Row> data, SparkEnvironment env) {
+        if (config.hasPath(SINK_COLUMNS) && !config.getString(SINK_COLUMNS).isEmpty()) {
+            String[] sinkColumns = config.getString(SINK_COLUMNS).split(",");
+//            if (sinkColumns.length == 1) {
+//                data = data.select(sinkColumns[0]);
+//            } else {
+                data = data.selectExpr(sinkColumns);
+//            }
+        }
         if (config.hasPath(CONFIG_DROP_MODE) && 1 == config.getInt(CONFIG_DROP_MODE)) {
-            return data.withColumn(FIELD_ETL_TASK_ID, config.hasPath(CONFIG_TASK_ID) ? functions.lit(config.getString(CONFIG_TASK_ID)) : functions.lit(null).cast("string"));
+            data = data.withColumn(FIELD_ETL_TASK_ID, config.hasPath(CONFIG_TASK_ID) ? functions.lit(config.getString(CONFIG_TASK_ID)) : functions.lit(null).cast("string"));
         }
         cleanOldDataInSink(env);
         return data;
