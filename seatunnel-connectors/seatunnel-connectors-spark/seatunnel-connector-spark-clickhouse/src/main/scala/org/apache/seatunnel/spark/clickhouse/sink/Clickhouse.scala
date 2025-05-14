@@ -80,7 +80,7 @@ class Clickhouse extends SparkBatchSink {
 
     if (!config.hasPath(FIELDS)) {
       val tableColumnSet = tableSchema.keySet.map(c => c.toLowerCase)
-      fields = dataFrame.schema.fields.filter(f => tableColumnSet.contains(f.name.toLowerCase)).map(f => f.name).toList
+      fields = dfFields.filter(f => tableColumnSet.contains(f.toLowerCase)).toList
     }
     initSQL = initPrepareSQL()
     dataFrame.foreachPartition { iter: Iterator[Row] =>
@@ -243,7 +243,7 @@ class Clickhouse extends SparkBatchSink {
       table,
       this.fields.map(a => a).mkString(","),
       prepare.mkString(","))
-
+    println("insert sql: " + sql)
     sql
   }
 
