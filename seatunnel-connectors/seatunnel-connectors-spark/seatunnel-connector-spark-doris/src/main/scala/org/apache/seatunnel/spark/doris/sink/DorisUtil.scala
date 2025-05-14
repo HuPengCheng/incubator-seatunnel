@@ -49,7 +49,7 @@ object DorisUtil extends Serializable {
                  api: String,
                  user: String,
                  password: String): (Boolean, CloseableHttpClient, CloseableHttpResponse) = {
-
+    LOG.info("Starting Doris stream load: " + api)
     var response: CloseableHttpResponse = null
     var status = true
     try {
@@ -91,6 +91,7 @@ object DorisUtil extends Serializable {
       case _: Exception => status = false
         (status, httpclient, response)
     }
+    LOG.info("Doris stream load finished, status: " + status + ", response: " + response)
     (status, httpclient, response)
   }
 

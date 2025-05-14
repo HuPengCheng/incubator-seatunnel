@@ -24,6 +24,9 @@ import org.apache.seatunnel.spark.batch.SparkBatchSink
 import org.apache.seatunnel.spark.doris.sink.Config._
 import org.apache.spark.sql.{Dataset, Row}
 
+import java.sql.{Connection, DriverManager}
+import java.util
+import scala.collection.JavaConversions.asScalaBuffer
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
@@ -91,8 +94,52 @@ class Doris extends SparkBatchSink with Serializable {
         }
       }
     }
+    if (config.hasPath(PARTITION_BY)) {
+      val partitions = config.getStringList(PARTITION_BY)
+      propertiesMap.put("doris.sink.properties.partitions", partitions.mkString(","))
+    }
+    if (config.hasPath(SINK_COLUMNS) && !config.hasPath("doris.sink.properties.columns")) {
+      val sinkColumns = config.getString(SINK_COLUMNS)
+      propertiesMap.put("doris.sink.properties.columns", sinkColumns)
+    }
+
     if (config.hasPath(Config.BULK_SIZE) && config.getInt(Config.BULK_SIZE) > 0) {
       batch_size = config.getInt(Config.BULK_SIZE)
+    }
+  }
+
+
+  override def cleanAllDataInSink(env: SparkEnvironment): Unit = {
+    val sql = s"truncate table ${config.getString(TABLE_NAME)}"
+    executeSql(sql)
+  }
+
+  override def cleanDataByEtlIdInSink(env: SparkEnvironment): Unit = {
+    val sql = s"delete from ${config.getString(TABLE_NAME)} where ETLTASKID = '${config.getString("task.id")}'"
+    executeSql(sql)
+  }
+
+  override def cleanDataByPartitionInSink(env: SparkEnvironment, partitions: util.List[String]): Unit = {
+    // TRUNCATE TABLE tbl PARTITION(p1, p2);
+    val sql = s"TRUNCATE TABLE ${config.getString(TABLE_NAME)} PARTITION(${partitions.mkString(",")})"
+    executeSql(sql)
+  }
+
+  def executeSql(sql: String): Unit = {
+    // 获取数据库连接
+    val user: String = config.getString(Config.USER)
+    val password: String = config.getString(Config.PASSWORD)
+    val jdbcUrl: String = config.getString(Config.JDBC_URL)
+    val connection: Connection = DriverManager.getConnection(s"${jdbcUrl}/${config.getString(DATABASE)}", user, password)
+    try {
+      val statement = connection.createStatement()
+      try {
+        statement.execute(sql)
+      } finally {
+        statement.close()
+      }
+    } finally {
+      connection.close()
     }
   }
 
