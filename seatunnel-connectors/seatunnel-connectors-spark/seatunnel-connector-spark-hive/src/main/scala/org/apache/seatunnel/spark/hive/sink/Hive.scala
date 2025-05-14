@@ -94,6 +94,12 @@ class Hive extends SparkBatchSink with Logging {
       } else {
         frameWriter.saveAsTable(resultTableName)
       }
+      if (!tableExists && config.hasPath("comment")) {
+        // 表注释
+        val comment = config.getString("comment")
+        // ALTER TABLE 表名 SET TBLPROPERTIES ('comment' = '注释内容');
+        environment.getSparkSession.sql(s"ALTER TABLE ${resultTableName} SET TBLPROPERTIES ('comment' = '$comment')")
+      }
     }
   }
 
