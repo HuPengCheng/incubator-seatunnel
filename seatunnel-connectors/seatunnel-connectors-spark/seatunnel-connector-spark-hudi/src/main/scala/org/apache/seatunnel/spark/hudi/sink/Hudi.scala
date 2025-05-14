@@ -38,6 +38,8 @@ import scala.collection.JavaConversions._
 
 class Hudi extends SparkBatchSink {
 
+  private var tableExists = false
+
   override def getPluginName: String = "Hudi"
   val defaultBasePath = "/user/ypdata/hudi"
   val ETL_TASK_ID = "ETLTASKID"
@@ -62,7 +64,8 @@ class Hudi extends SparkBatchSink {
     super.cleanOldDataInSink(env)
     val basePath = getBasePath
     val hdfs = getHdfs(basePath)
-    if (hdfs.exists(new Path(basePath)) && config.hasPath(DROP_MODE)) {
+    tableExists = hdfs.exists(new Path(basePath))
+    if (tableExists && config.hasPath(DROP_MODE)) {
       val hudiTableDf = env.getSparkSession.read.format("hudi").load(basePath + "/*/*/*")
       if ("1".equals(config.getString(DROP_MODE))) {
         if (hudiTableDf.schema.fieldNames.contains(ETL_TASK_ID)) {
