@@ -25,7 +25,7 @@ import org.apache.seatunnel.spark.SparkEnvironment
 import org.apache.seatunnel.spark.batch.SparkBatchSource
 import org.apache.seatunnel.spark.utils.SparkStructTypeUtil
 import org.apache.spark.sql.{Dataset, Row}
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.{StringType, StructType}
 
 class MongoDB extends SparkBatchSource {
 
@@ -56,12 +56,12 @@ class MongoDB extends SparkBatchSource {
   }
 
   override def getData(env: SparkEnvironment): Dataset[Row] = {
-    if (schema.length > 0) {
-      MongoSpark.builder().sparkSession(env.getSparkSession).readConfig(readConfig).build().toDF(
-        schema)
-    } else {
-      MongoSpark.load(env.getSparkSession, readConfig)
+    if (schema.isEmpty) {
+      MongoSpark.load(env.getSparkSession, readConfig).schema.fields.foreach(field => {
+          schema = schema.add(field.name, StringType, nullable = true)
+      })
     }
+    MongoSpark.builder().sparkSession(env.getSparkSession).readConfig(readConfig).build().toDF(schema)
   }
 
   override def checkConfig(): CheckResult = {
