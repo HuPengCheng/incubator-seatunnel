@@ -27,7 +27,6 @@ import org.apache.seatunnel.core.base.Starter;
 import org.apache.seatunnel.core.base.config.ConfigBuilder;
 import org.apache.seatunnel.core.base.config.ConfigParser;
 import org.apache.seatunnel.core.base.config.EngineType;
-import org.apache.seatunnel.core.base.utils.CompressionUtils;
 import org.apache.seatunnel.core.spark.args.SparkCommandArgs;
 import org.apache.seatunnel.plugin.discovery.PluginIdentifier;
 import org.apache.seatunnel.plugin.discovery.spark.SparkSinkPluginDiscovery;
@@ -406,7 +405,6 @@ public class SparkStarter implements Starter {
             Common.setDeployMode(commandArgs.getDeployMode());
             Common.setStarter(true);
             Path pluginTarball = Common.pluginTarball();
-            CompressionUtils.tarGzip(Common.pluginRootDir(), pluginTarball);
             this.files.add(pluginTarball);
             this.files.add(Paths.get(commandArgs.getConfigFile()));
             return super.buildCommands();
