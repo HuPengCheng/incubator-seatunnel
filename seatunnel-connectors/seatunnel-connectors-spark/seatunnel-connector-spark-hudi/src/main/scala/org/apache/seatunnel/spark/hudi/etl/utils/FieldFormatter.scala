@@ -50,7 +50,7 @@ object FieldFormatter {
     private def getDropSql(sparkSession: SparkSession, dataframe: DataFrame, func: String, tableName: String): String = {
         TypeCleaner.registerUdf(sparkSession)
         val newColnums = dataframe.schema.fields.map(field => {
-            val targetFieldName = field.name.toLowerCase
+            val targetFieldName = field.name.toUpperCase
             val fieldType = field.dataType.typeName.toLowerCase
             if (fieldType.equals("date") || fieldType.equals("timestamp")) {
                 s"(cast_format_string(${field.name},'${field.dataType.simpleString}', true) ) AS $targetFieldName"
