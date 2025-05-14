@@ -16,11 +16,17 @@
  */
 package org.apache.seatunnel.spark.hive.source
 
+import com.alibaba.druid.sql.ast.SQLStatement
+import com.alibaba.druid.sql.dialect.hive.parser.HiveStatementParser
+import com.alibaba.druid.sql.dialect.hive.visitor.HiveSchemaStatVisitor
+import com.alibaba.druid.stat.TableStat
 import org.apache.seatunnel.common.config.CheckConfigUtil.checkAllExists
 import org.apache.seatunnel.common.config.CheckResult
 import org.apache.seatunnel.spark.SparkEnvironment
 import org.apache.seatunnel.spark.batch.SparkBatchSource
 import org.apache.spark.sql.{Dataset, Row}
+
+import java.util
 
 class Hive extends SparkBatchSource {
 
@@ -33,4 +39,23 @@ class Hive extends SparkBatchSource {
   }
 
   override def getPluginName: String = "Hive"
+
+  /**
+   * This is a lifecycle method, this method will be executed after Plugin created.
+   *
+   * @param env environment
+   */
+  override def prepare(env: SparkEnvironment): Unit = {
+    val parser = new HiveStatementParser(config.getString("pre_sql"))
+    val sqlStatement: SQLStatement = parser.parseStatement
+    val visitor: HiveSchemaStatVisitor = new HiveSchemaStatVisitor
+    sqlStatement.accept(visitor)
+    val tables: util.Map[TableStat.Name, TableStat] = visitor.getTables
+    import scala.collection.JavaConversions._
+    for (t <- tables.keySet) {
+      // 强制刷新hive元数据，防止表结构变更导致找不到字段
+      println(s"refresh table $t")
+      env.getSparkSession.catalog.refreshTable(t.getName)
+    }
+  }
 }
