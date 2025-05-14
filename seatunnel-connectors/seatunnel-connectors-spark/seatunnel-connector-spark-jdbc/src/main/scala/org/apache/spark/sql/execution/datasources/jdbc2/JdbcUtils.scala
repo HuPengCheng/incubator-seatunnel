@@ -17,6 +17,7 @@
 package org.apache.spark.sql.execution.datasources.jdbc2
 
 import org.apache.commons.lang3.StringUtils
+import org.apache.seatunnel.shade.com.typesafe.config.Config
 import org.apache.spark.TaskContext
 import org.apache.spark.executor.InputMetrics
 import org.apache.spark.internal.Logging
@@ -37,6 +38,7 @@ import org.apache.spark.util.NextIterator
 
 import java.sql.{Connection, Driver, DriverManager, JDBCType, PreparedStatement, ResultSet, ResultSetMetaData, SQLException}
 import java.util.Locale
+import scala.collection.JavaConversions.mapAsScalaMap
 import scala.collection.JavaConverters._
 import scala.util.Try
 import scala.util.control.NonFatal
@@ -64,6 +66,17 @@ object JdbcUtils extends Logging {
       }
       driver.connect(options.url, options.asConnectionProperties)
     }
+  }
+
+  def createConnectionFactory(config: Config): () => Connection = {
+    var parameters: Map[String, String] = config.root().unwrapped().toMap.map {
+      case (k, v) => k -> v.toString
+    }
+    if (parameters.contains("table") && !parameters.contains("dbtable")) {
+      parameters += ("dbtable" -> parameters("table"))
+    }
+    val jdbcOptions = new JDBCOptions(parameters)
+    JdbcUtils.createConnectionFactory(jdbcOptions)
   }
 
   /**
