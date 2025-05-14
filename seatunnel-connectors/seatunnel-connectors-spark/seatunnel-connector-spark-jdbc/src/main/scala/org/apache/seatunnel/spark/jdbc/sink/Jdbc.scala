@@ -73,32 +73,22 @@ class Jdbc extends SparkBatchSink {
     config = config.withFallback(defaultConfig)
   }
 
-  /**
-   * 删除老数据，保证任务幂等执行
-   *
-   * @param env spark运行环境
-   */
-  override def cleanOldDataInSink(env: SparkEnvironment): Unit = {
-    super.cleanOldDataInSink(env)
-    val parameters: Map[String, String] = config.root().unwrapped().toMap.map {
-      case (k, v) => k -> v.toString
-    }
-    val jdbcOptions = new JdbcOptionsInWrite(parameters), parameters
-    val sql = if ("0" == parameters("drop.mode")) {
-      // truncate table
-      s"truncate table ${parameters("dbTable")}"
-    } else if ("1" == parameters("drop.mode")) {
-      // delete by etltaskid
-      s"delete from ${parameters("dbTable")} where ETLTASKID = '${parameters("task.id")}'"
-    } else {
-      // do nothing
-      return
-    }
-    val conn = JdbcUtils.createConnectionFactory(jdbcOptions)()
+  override def cleanAllDataInSink(env: SparkEnvironment): Unit = {
+    val sql = s"truncate table ${config.getString("dbTable")}"
+    executeSql(sql)
+  }
+
+  override def cleanDataByEtlIdInSink(env: SparkEnvironment): Unit = {
+    val sql = s"delete from ${config.getString("dbTable")} where ETLTASKID = '${config.getString("task.id")}'"
+    executeSql(sql)
+  }
+
+  private def executeSql(sql: String) = {
+    val conn = JdbcUtils.createConnectionFactory(config)()
     try {
       val stmt = conn.createStatement()
       try {
-        println("clean data sql: " + sql)
+        println("execute sql: " + sql)
         stmt.execute(sql)
       } catch {
         case e: SQLException => e.printStackTrace()
