@@ -27,6 +27,10 @@
 
     <artifactId>seatunnel-connector-spark-jdbc</artifactId>
 
+    <properties>
+        <jsqlparser.version>4.9</jsqlparser.version>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.apache.seatunnel</groupId>
@@ -54,5 +58,10 @@
             <artifactId>spark-streaming_${scala.binary.version}</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>com.github.jsqlparser</groupId>
+            <artifactId>jsqlparser</artifactId>
+            <version>${jsqlparser.version}</version>
+        </dependency>
     </dependencies>
 </project>
