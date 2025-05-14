@@ -29,6 +29,7 @@ import org.apache.seatunnel.shade.com.typesafe.config.Config;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigFactory;
 
 import org.apache.seatunnel.spark.encrypt.Encryptor;
+import org.apache.seatunnel.spark.encrypt.SqlUdf;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
@@ -96,6 +97,7 @@ public class SparkEnvironment implements RuntimeEnv {
         //  support submit multi-jar in code or remove this logic.
         // this.sparkSession.conf().set("spark.jars",pluginPaths.stream().map(URL::getPath).collect(Collectors.joining(",")));
         Encryptor.registerUdf(sparkSession);
+        SqlUdf.register(sparkSession);
     }
 
     @Override
@@ -121,6 +123,9 @@ public class SparkEnvironment implements RuntimeEnv {
     private SparkConf createSparkConf() {
         SparkConf sparkConf = new SparkConf();
         this.config.entrySet().forEach(entry -> sparkConf.set(entry.getKey(), String.valueOf(entry.getValue().unwrapped())));
+        // hudi数据按主键合并参数
+        // spark.sql.hive.convertMetastoreParquet = false
+        sparkConf.set("spark.sql.hive.convertMetastoreParquet", "false");
         return sparkConf;
     }
 
