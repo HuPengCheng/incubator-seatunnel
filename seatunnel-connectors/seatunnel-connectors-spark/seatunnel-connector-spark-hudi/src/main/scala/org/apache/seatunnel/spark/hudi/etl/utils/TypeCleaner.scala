@@ -48,21 +48,21 @@ object TypeCleaner {
 
     //hiveLconf/hudiLconf的字段类型需要修改
     //date/timestamp->String,bigdecimal/decimal->double
-    def clean(sparkSession: SparkSession, dataframe: DataFrame): DataFrame = {
-        registerUdf(sparkSession)
-        val func = "cast_format"
-        dataframe.selectExpr(dataframe.schema.fields.map(field => {
-            val targetFieldName = field.name.toLowerCase
-            val fieldTypeName = field.dataType.typeName.toLowerCase
-            if (fieldTypeName.equals("date") || fieldTypeName.equals("timestamp")) {
-                s"(${func}_string(${field.name},'${field.dataType.simpleString}', true) ) AS ${targetFieldName}"
-            } else if (fieldTypeName.startsWith("decimal")) {
-                s"(${func}_double(${field.name},'${field.dataType.simpleString}', true) ) AS ${targetFieldName}"
-            } else {
-                targetFieldName
-            }
-        }): _*)
-    }
+//    def clean(sparkSession: SparkSession, dataframe: DataFrame): DataFrame = {
+//        registerUdf(sparkSession)
+//        val func = "cast_format"
+//        dataframe.selectExpr(dataframe.schema.fields.map(field => {
+//            val targetFieldName = field.name.toLowerCase
+//            val fieldTypeName = field.dataType.typeName.toLowerCase
+//            if (fieldTypeName.equals("date") || fieldTypeName.equals("timestamp")) {
+//                s"(${func}_string(${field.name},'${field.dataType.simpleString}', true) ) AS ${targetFieldName}"
+//            } else if (fieldTypeName.startsWith("decimal")) {
+//                s"(${func}_double(${field.name},'${field.dataType.simpleString}', true) ) AS ${targetFieldName}"
+//            } else {
+//                targetFieldName
+//            }
+//        }): _*)
+//    }
 
     /*
     {
@@ -72,37 +72,37 @@ object TypeCleaner {
             }
         }
      */
-    def clean(sparkSession: SparkSession, colnameTypes: java.util.LinkedHashMap[String, String], dataframe: DataFrame, isFillDefault: Boolean = false): DataFrame = {
-
-        cleanSql(sparkSession, colnameTypes, dataframe, isFillDefault)
-    }
-
-
-    def cleanSql(sparkSession: SparkSession, colnameTypes: java.util.LinkedHashMap[String, String], dataframe: DataFrame, isFillDefault: Boolean): DataFrame = {
+//    def clean(sparkSession: SparkSession, colnameTypes: java.util.LinkedHashMap[String, String], dataframe: DataFrame, isFillDefault: Boolean = false): DataFrame = {
+//
+//        cleanSql(sparkSession, colnameTypes, dataframe, isFillDefault)
+//    }
 
 
-        val castFunName = "cast_format"
-        val tablename = "cast_format_" + System.currentTimeMillis()
-        val sqlInfo = genCleanSql(sparkSession, colnameTypes, dataframe, castFunName, tablename, isFillDefault)
-
-        registerUdf(sparkSession)
-
-        dataframe.createOrReplaceTempView(tablename)
-
-        println("========cleanSql==================")
-        println(s"sql : ${sqlInfo._1}")
-        println(s"isFillDefault : ${isFillDefault}")
-        println("========cleanSql end==================")
-        var df = sparkSession.sql(sqlInfo._1)
-        sqlInfo._2.foreach(f => {
-            df = df.withColumn(f._1, lit(null))
-        })
-
-        println(s"==============${sqlInfo._2.size} +++++${sqlInfo._2.mkString(",")}")
-
-        df.printSchema()
-        df
-    }
+//    def cleanSql(sparkSession: SparkSession, colnameTypes: java.util.LinkedHashMap[String, String], dataframe: DataFrame, isFillDefault: Boolean): DataFrame = {
+//
+//
+//        val castFunName = "cast_format"
+//        val tablename = "cast_format_" + System.currentTimeMillis()
+//        val sqlInfo = genCleanSql(sparkSession, colnameTypes, dataframe, castFunName, tablename, isFillDefault)
+//
+//        registerUdf(sparkSession)
+//
+//        dataframe.createOrReplaceTempView(tablename)
+//
+//        println("========cleanSql==================")
+//        println(s"sql : ${sqlInfo._1}")
+//        println(s"isFillDefault : ${isFillDefault}")
+//        println("========cleanSql end==================")
+//        var df = sparkSession.sql(sqlInfo._1)
+//        sqlInfo._2.foreach(f => {
+//            df = df.withColumn(f._1, lit(null))
+//        })
+//
+//        println(s"==============${sqlInfo._2.size} +++++${sqlInfo._2.mkString(",")}")
+//
+//        df.printSchema()
+//        df
+//    }
 
 
     def registerUdf(sparkSession: SparkSession) = {
@@ -207,32 +207,32 @@ object TypeCleaner {
         }
     }
 
-    private def genCleanSql(sparkSession: SparkSession, colnameTypes: java.util.LinkedHashMap[String, String], dataframe: DataFrame, func: String, tableName: String, isFillDefault: Boolean): (String, Map[String, String]) = {
-
-        val colnumTypes = colnameTypes.asScala.map(col => {
-            (col._1.trim.toUpperCase, col._2)
-        })
-
-        val castColnums = dataframe.schema.fieldNames.filter(f => colnumTypes.keySet.contains(f)).map(f => {
-            val typeInfo = colnumTypes(f)
-            val dataType = typeInfo.split(",")(0).toLowerCase
-            if (!typeList.contains(dataType)) {
-                s"(${func}_string($f,'$typeInfo',$isFillDefault) ) AS $f"
-            } else {
-                s"(${func}_$dataType($f,'$typeInfo',$isFillDefault) ) AS $f"
-            }
-        })
-
-        val notExistColnum = colnumTypes.filterNot(f => {
-            dataframe.schema.fieldNames.contains(f._1)
-        }).toMap
-
-        println(s"========= dataframe.schema.fieldNames : ${dataframe.schema.fieldNames.mkString(";")}")
-
-        println(s"========= notExistColnum : ${notExistColnum.mkString(";")}")
-
-        val sql = s"select ${castColnums.mkString(",")}  from $tableName"
-        (sql, notExistColnum)
-    }
+//    private def genCleanSql(sparkSession: SparkSession, colnameTypes: java.util.LinkedHashMap[String, String], dataframe: DataFrame, func: String, tableName: String, isFillDefault: Boolean): (String, Map[String, String]) = {
+//
+//        val colnumTypes = colnameTypes.asScala.map(col => {
+//            (col._1.trim.toUpperCase, col._2)
+//        })
+//
+//        val castColnums = dataframe.schema.fieldNames.filter(f => colnumTypes.keySet.contains(f)).map(f => {
+//            val typeInfo = colnumTypes(f)
+//            val dataType = typeInfo.split(",")(0).toLowerCase
+//            if (!typeList.contains(dataType)) {
+//                s"(${func}_string($f,'$typeInfo',$isFillDefault) ) AS $f"
+//            } else {
+//                s"(${func}_$dataType($f,'$typeInfo',$isFillDefault) ) AS $f"
+//            }
+//        })
+//
+//        val notExistColnum = colnumTypes.filterNot(f => {
+//            dataframe.schema.fieldNames.contains(f._1)
+//        }).toMap
+//
+//        println(s"========= dataframe.schema.fieldNames : ${dataframe.schema.fieldNames.mkString(";")}")
+//
+//        println(s"========= notExistColnum : ${notExistColnum.mkString(";")}")
+//
+//        val sql = s"select ${castColnums.mkString(",")}  from $tableName"
+//        (sql, notExistColnum)
+//    }
 
 }
