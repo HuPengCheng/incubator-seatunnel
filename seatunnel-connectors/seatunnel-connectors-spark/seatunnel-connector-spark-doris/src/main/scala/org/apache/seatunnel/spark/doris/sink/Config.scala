@@ -20,6 +20,7 @@ package org.apache.seatunnel.spark.doris.sink
 object Config extends Serializable {
 
   val HOST = "fenodes"
+  val JDBC_URL = "jdbc.url"
   val DATABASE = "database"
   val TABLE_NAME = "table"
   val USER = "user"
@@ -27,6 +28,8 @@ object Config extends Serializable {
   val BULK_SIZE = "batch_size"
   val ARGS_PREFIX = "doris."
   val COLUMN_SEPARATOR = "column_separator"
+  val PARTITION_BY = "partition_by"
+  val SINK_COLUMNS = "sink_columns"
 
   val CHARSET = "UTF-8"
   val BINARY_CT = "application/octet-stream"
