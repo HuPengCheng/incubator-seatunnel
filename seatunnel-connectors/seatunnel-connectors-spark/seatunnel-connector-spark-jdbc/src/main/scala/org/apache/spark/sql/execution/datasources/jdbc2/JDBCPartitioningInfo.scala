@@ -21,6 +21,8 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.util.DateTimeUtils
+import org.apache.spark.sql.functions.{date_format, from_utc_timestamp, lit}
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.jdbc.JdbcDialects
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.{DataType, DateType, NumericType, StructType, TimestampType}
@@ -169,7 +171,7 @@ private[sql] object JDBCRelation extends Logging {
       resolver(f.name, columnName) || resolver(dialect.quoteIdentifier(f.name), columnName)
     }.getOrElse {
       throw new AnalysisException(s"User-defined partition column $columnName not " +
-        s"found in the JDBC relation: ${schema.simpleString(Utils.maxNumToStringFields)}")
+        s"found in the JDBC relation: ${schema.simpleString(SQLConf.MAX_TO_STRING_FIELDS.defaultValue.get)}")
     }
     column.dataType match {
       case _: NumericType | DateType | TimestampType =>
@@ -193,10 +195,22 @@ private[sql] object JDBCRelation extends Logging {
                                          columnType: DataType,
                                          timeZoneId: String): String = {
     def dateTimeToString(): String = {
-      val timeZone = DateTimeUtils.getTimeZone(timeZoneId)
       val dateTimeStr = columnType match {
-        case DateType => DateTimeUtils.dateToString(value.toInt, timeZone)
-        case TimestampType => DateTimeUtils.timestampToString(value, timeZone)
+        // 处理 DateType（底层存储为 Int 类型，表示自 Epoch 以来的天数）
+        case DateType =>
+          // 将天数转换为日期字符串（格式：yyyy-MM-dd）
+          date_format(
+            from_utc_timestamp(lit(value.toInt * 86400).cast("timestamp"), timeZoneId),
+            "yyyy-MM-dd"
+          ).expr.eval().toString
+
+        // 处理 TimestampType（底层存储为 Long 类型，表示微秒）
+        case TimestampType =>
+          // 将微秒转换为时间戳字符串（格式：yyyy-MM-dd HH:mm:ss）
+          date_format(
+            from_utc_timestamp(lit(value / 1000000).cast("timestamp"), timeZoneId),
+            "yyyy-MM-dd HH:mm:ss"
+          ).expr.eval().toString
       }
       s"'$dateTimeStr'"
     }

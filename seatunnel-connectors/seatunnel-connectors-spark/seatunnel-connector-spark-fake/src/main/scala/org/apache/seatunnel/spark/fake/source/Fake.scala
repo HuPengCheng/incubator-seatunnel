@@ -34,7 +34,7 @@ class Fake extends SparkBatchSource {
     val schema = new StructType()
       .add("raw_message", DataTypes.StringType)
 
-    env.getSparkSession.createDataset(s)(RowEncoder(schema))
+    env.getSparkSession.createDataset(s)(RowEncoder.encoderFor(schema))
   }
 
   override def getPluginName: String = "Fake"

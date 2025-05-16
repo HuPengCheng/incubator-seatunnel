@@ -37,7 +37,7 @@ class NullRate extends BaseSparkTransform {
       fl._1 -> env.getSparkSession.sparkContext.longAccumulator(fl._1)
     })
 
-    df.foreachPartition(iter => {
+    df.foreachPartition((iter: Iterator[Row]) => {
       while (iter.hasNext) {
         allCount.add(1L)
         val row = iter.next()
@@ -75,7 +75,7 @@ class NullRate extends BaseSparkTransform {
         .add("setting_rate", DataTypes.DoubleType)
         .add("null_count", DataTypes.LongType)
         .add("rate_percent", DataTypes.DoubleType)
-      env.getSparkSession.createDataset(nullRateRows)(RowEncoder(schema)).createOrReplaceTempView(config.getString(NullRateConfig.SAVE_TO_TABLE_NAME))
+      env.getSparkSession.createDataset(nullRateRows)(RowEncoder.encoderFor(schema)).createOrReplaceTempView(config.getString(NullRateConfig.SAVE_TO_TABLE_NAME))
     }
 
     df

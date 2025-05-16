@@ -85,6 +85,7 @@
         <module>seatunnel-dist</module>
         <module>seatunnel-examples</module>
         <module>seatunnel-e2e</module>
+        <module>seatunnel-shade</module>
     </modules>
 
     <properties>
@@ -92,12 +93,13 @@
         <seatunnel.config.shade.version>2.1.1</seatunnel.config.shade.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>1.8</java.version>
-        <scala.version>2.11.12</scala.version>
-        <scala.binary.version>2.11</scala.binary.version>
+        <scala.version>2.12.18</scala.version>
+        <scala.binary.version>2.12</scala.binary.version>
+        <maven.compiler.release>8</maven.compiler.release>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
-        <spark.version>2.4.0</spark.version>
-        <spark.binary.version>2.4</spark.binary.version>
+        <spark.version>3.5.4</spark.version>
+        <spark.binary.version>3.5</spark.binary.version>
         <neo4j.connector.spark.version>4.1.0</neo4j.connector.spark.version>
         <iceberg.version>0.13.1</iceberg.version>
         <flink.version>1.13.6</flink.version>
@@ -118,7 +120,7 @@
         <maven-source-plugin.version>3.0.1</maven-source-plugin.version>
         <maven-javadoc-plugin.version>2.9.1</maven-javadoc-plugin.version>
         <maven-deploy-plugin.version>2.8.2</maven-deploy-plugin.version>
-        <scala-maven-plugin.version>3.3.1</scala-maven-plugin.version>
+        <scala-maven-plugin.version>3.4.4</scala-maven-plugin.version>
         <maven-compiler-plugin.version>2.0.2</maven-compiler-plugin.version>
         <spoiwo.version>1.8.0</spoiwo.version>
         <play-mailer.version>7.0.2</play-mailer.version>
@@ -148,7 +150,7 @@
         <docker.hub>apache</docker.hub>
         <docker.tag>${project.version}</docker.tag>
         <junit.version>4.13.2</junit.version>
-        <tispark.version>2.4.1</tispark.version>
+        <tispark.version>3.2.3</tispark.version>
         <druid.version>0.22.1</druid.version>
         <sshd.version>2.7.0</sshd.version>
         <calcite-druid.version>1.29.0</calcite-druid.version>
@@ -173,6 +175,7 @@
         <auto-service.version>1.0.1</auto-service.version>
         <jmockdata.version>4.3.0</jmockdata.version>
         <snappy-java.version>1.1.8.3</snappy-java.version>
+        <commons-lang3.version>3.1</commons-lang3.version>
     </properties>
 
     <dependencyManagement>
@@ -182,6 +185,7 @@
                 <artifactId>seatunnel-config-shade</artifactId>
                 <version>${seatunnel.config.shade.version}</version>
             </dependency>
+
             <!--spark-->
             <dependency>
                 <groupId>org.apache.spark</groupId>
@@ -350,11 +354,11 @@
                 <version>${parquet-avro.version}</version>
             </dependency>
 
-            <dependency>
-                <groupId>org.elasticsearch</groupId>
-                <artifactId>elasticsearch-spark-20_${scala.binary.version}</artifactId>
-                <version>${elasticsearch-spark.version}</version>
-            </dependency>
+<!--            <dependency>-->
+<!--                <groupId>org.elasticsearch</groupId>-->
+<!--                <artifactId>elasticsearch-spark-20_${scala.binary.version}</artifactId>-->
+<!--                <version>${elasticsearch-spark.version}</version>-->
+<!--            </dependency>-->
 
             <dependency>
                 <groupId>org.apache.flink</groupId>
@@ -398,11 +402,11 @@
                 </exclusions>
             </dependency>
 
-            <dependency>
-                <groupId>org.apache.kudu</groupId>
-                <artifactId>kudu-spark2_${scala.binary.version}</artifactId>
-                <version>${kudu-spark.version}</version>
-            </dependency>
+<!--            <dependency>-->
+<!--                <groupId>org.apache.kudu</groupId>-->
+<!--                <artifactId>kudu-spark2_${scala.binary.version}</artifactId>-->
+<!--                <version>${kudu-spark.version}</version>-->
+<!--            </dependency>-->
 
             <dependency>
                 <groupId>com.redislabs</groupId>
@@ -410,11 +414,11 @@
                 <version>${spark-redis.version}</version>
             </dependency>
 
-            <dependency>
-                <groupId>org.apache.spark</groupId>
-                <artifactId>spark-streaming-kafka-0-10_${scala.binary.version}</artifactId>
-                <version>${spark.version}</version>
-            </dependency>
+<!--            <dependency>-->
+<!--                <groupId>org.apache.spark</groupId>-->
+<!--                <artifactId>spark-streaming-kafka-0-10_${scala.binary.version}</artifactId>-->
+<!--                <version>${spark.version}</version>-->
+<!--            </dependency>-->
             
             <dependency>
                 <groupId>org.projectlombok</groupId>
@@ -564,7 +568,7 @@
 
             <dependency>
                 <groupId>com.pingcap.tispark</groupId>
-                <artifactId>tispark-assembly</artifactId>
+                <artifactId>tispark-assembly-3.0_2.12</artifactId>
                 <version>${tispark.version}</version>
             </dependency>
             <dependency>
@@ -588,11 +592,11 @@
                 <version>${config.version}</version>
             </dependency>
 
-            <dependency>
-                <groupId>org.neo4j</groupId>
-                <artifactId>neo4j-connector-apache-spark_${scala.binary.version}</artifactId>
-                <version>${neo4j.connector.spark.version}_for_spark_${spark.binary.version}</version>
-            </dependency>
+<!--            <dependency>-->
+<!--                <groupId>org.neo4j</groupId>-->
+<!--                <artifactId>neo4j-connector-apache-spark_${scala.binary.version}</artifactId>-->
+<!--                <version>${neo4j.connector.spark.version}_for_spark_${spark.binary.version}</version>-->
+<!--            </dependency>-->
 
             <dependency>
                 <groupId>org.influxdb</groupId>
@@ -666,6 +670,26 @@
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>${commons-lang3.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>commons-lang</groupId>
+            <artifactId>commons-lang</artifactId>
+            <version>2.5</version>
+        </dependency>
+        <dependency>
+            <groupId>commons-net</groupId>
+            <artifactId>commons-net</artifactId>
+            <version>3.6</version> <!-- 或其他所需版本 -->
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+            <version>4.5.13</version> <!-- 或其他所需版本 -->
         </dependency>
     </dependencies>
 
@@ -764,11 +788,11 @@
                     </executions>
                 </plugin>
 
-                <plugin>
-                    <groupId>io.fabric8</groupId>
-                    <artifactId>docker-maven-plugin</artifactId>
-                    <version>${docker-maven-plugin.version}</version>
-                </plugin>
+<!--                <plugin>-->
+<!--                    <groupId>io.fabric8</groupId>-->
+<!--                    <artifactId>docker-maven-plugin</artifactId>-->
+<!--                    <version>${docker-maven-plugin.version}</version>-->
+<!--                </plugin>-->
 
                 <!-- shade -->
                 <plugin>
@@ -884,47 +908,47 @@
                 
                 <!-- checkstyle (End) -->
 
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-source-plugin</artifactId>
-                    <version>${maven-source-plugin.version}</version>
-                    <executions>
-                        <execution>
-                            <id>attach-sources</id>
-                            <goals>
-                                <goal>jar-no-fork</goal>
-                            </goals>
-                        </execution>
-                    </executions>
-                </plugin>
+<!--                <plugin>-->
+<!--                    <groupId>org.apache.maven.plugins</groupId>-->
+<!--                    <artifactId>maven-source-plugin</artifactId>-->
+<!--                    <version>${maven-source-plugin.version}</version>-->
+<!--                    <executions>-->
+<!--                        <execution>-->
+<!--                            <id>attach-sources</id>-->
+<!--                            <goals>-->
+<!--                                <goal>jar-no-fork</goal>-->
+<!--                            </goals>-->
+<!--                        </execution>-->
+<!--                    </executions>-->
+<!--                </plugin>-->
 
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-javadoc-plugin</artifactId>
-                    <version>${maven-javadoc-plugin.version}</version>
-                    <configuration>
-                        <source>${maven.compiler.source}</source>
-                        <failOnError>false</failOnError>
-                        <aggregate>true</aggregate>
-                        <skip>${maven.javadoc.skip}</skip>
-                        <additionalparam>-Xdoclint:none</additionalparam>
-                    </configuration>
-                    <executions>
-                        <execution>
-                            <id>attach-javadocs</id>
-                            <goals>
-                                <goal>jar</goal>
-                            </goals>
-                        </execution>
-                    </executions>
-                </plugin>
+<!--                <plugin>-->
+<!--                    <groupId>org.apache.maven.plugins</groupId>-->
+<!--                    <artifactId>maven-javadoc-plugin</artifactId>-->
+<!--                    <version>${maven-javadoc-plugin.version}</version>-->
+<!--                    <configuration>-->
+<!--                        <source>${maven.compiler.source}</source>-->
+<!--                        <failOnError>false</failOnError>-->
+<!--                        <aggregate>true</aggregate>-->
+<!--                        <skip>${maven.javadoc.skip}</skip>-->
+<!--                        <additionalparam>-Xdoclint:none</additionalparam>-->
+<!--                    </configuration>-->
+<!--                    <executions>-->
+<!--                        <execution>-->
+<!--                            <id>attach-javadocs</id>-->
+<!--                            <goals>-->
+<!--                                <goal>jar</goal>-->
+<!--                            </goals>-->
+<!--                        </execution>-->
+<!--                    </executions>-->
+<!--                </plugin>-->
 
 
-                <plugin>
-                    <groupId>org.codehaus.mojo</groupId>
-                    <artifactId>build-helper-maven-plugin</artifactId>
-                    <version>${maven-helper-plugin.version}</version>
-                </plugin>
+<!--                <plugin>-->
+<!--                    <groupId>org.codehaus.mojo</groupId>-->
+<!--                    <artifactId>build-helper-maven-plugin</artifactId>-->
+<!--                    <version>${maven-helper-plugin.version}</version>-->
+<!--                </plugin>-->
 
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>

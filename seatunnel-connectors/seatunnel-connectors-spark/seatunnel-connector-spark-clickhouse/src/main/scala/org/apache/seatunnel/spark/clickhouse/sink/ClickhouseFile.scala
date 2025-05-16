@@ -74,7 +74,7 @@ class ClickhouseFile extends SparkBatchSink {
     import session.implicits._
     val encoder = Encoders.tuple(
       ExpressionEncoder[Shard],
-      RowEncoder(data.schema))
+      RowEncoder.encoderFor(data.schema))
     data.map(item => {
       val hashInstance = XXHashFactory.fastestInstance().hash64()
       val shard = getRowShard(distributedEngine.equals(this.table.engine), this.table.shards,

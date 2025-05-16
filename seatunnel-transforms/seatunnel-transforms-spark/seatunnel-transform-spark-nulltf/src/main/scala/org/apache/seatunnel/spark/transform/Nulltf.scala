@@ -67,7 +67,7 @@ class Nulltf extends BaseSparkTransform {
         result += newRow
       }
       result.iterator
-    })(RowEncoder.apply(df.schema))
+    })(RowEncoder.encoderFor(df.schema))
 
   }
 

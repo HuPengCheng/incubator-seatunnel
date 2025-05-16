@@ -32,7 +32,7 @@ import org.apache.spark.sql.execution.datasources.jdbc2.JDBCSaveMode.JDBCSaveMod
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects, JdbcType}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.util.SchemaUtils
-import org.apache.spark.sql.{AnalysisException, DataFrame, Row}
+import org.apache.spark.sql.{AnalysisException, DataFrame, Encoders, Row}
 import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.NextIterator
 
@@ -384,13 +384,13 @@ object JdbcUtils extends Logging {
   /**
    * Convert a [[ResultSet]] into an iterator of Catalyst Rows.
    */
-  def resultSetToRows(resultSet: ResultSet, schema: StructType): Iterator[Row] = {
-    val inputMetrics =
-      Option(TaskContext.get()).map(_.taskMetrics().inputMetrics).getOrElse(new InputMetrics)
-    val encoder = RowEncoder(schema).resolveAndBind()
-    val internalRows = resultSetToSparkInternalRows(resultSet, schema, inputMetrics)
-    internalRows.map(encoder.fromRow)
-  }
+//  def resultSetToRows(resultSet: ResultSet, schema: StructType): Iterator[Row] = {
+//    val inputMetrics =
+//      Option(TaskContext.get()).map(_.taskMetrics().inputMetrics).getOrElse(new InputMetrics)
+//    val encoder = RowEncoder(schema).resolveAndBind()
+//    val internalRows = resultSetToSparkInternalRows(resultSet, schema, inputMetrics)
+//    internalRows.map(encoder.fromRow)
+//  }
 
   private[spark] def resultSetToSparkInternalRows(
                                                    resultSet: ResultSet,
@@ -814,11 +814,11 @@ object JdbcUtils extends Logging {
     def typeName(f: StructField): String = {
       // char/varchar gets translated to string type. Real data type specified by the user
       // is available in the field metadata as HIVE_TYPE_STRING
-      if (f.metadata.contains(HIVE_TYPE_STRING)) {
-        f.metadata.getString(HIVE_TYPE_STRING)
-      } else {
+//      if (f.metadata.contains(HIVE_TYPE_STRING)) {
+//        f.metadata.getString(HIVE_TYPE_STRING)
+//      } else {
         f.dataType.catalogString
-      }
+//      }
     }
 
     val userSchema = CatalystSqlParser.parseTableSchema(createTableColumnTypes)
@@ -827,7 +827,6 @@ object JdbcUtils extends Logging {
     // checks duplicate columns in the user specified column types.
     SchemaUtils.checkColumnNameDuplication(
       userSchema.map(_.name),
-      "in the createTableColumnTypes option value",
       nameEquality)
 
     // checks if user specified column names exist in the DataFrame schema
@@ -857,7 +856,6 @@ object JdbcUtils extends Logging {
 
       SchemaUtils.checkColumnNameDuplication(
         userSchema.map(_.name),
-        "in the customSchema option value",
         nameEquality)
 
       // This is resolved by names, use the custom filed dataType to replace the default dataType.

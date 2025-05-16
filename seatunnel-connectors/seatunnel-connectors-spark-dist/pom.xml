@@ -24,11 +24,11 @@
     <artifactId>seatunnel-connectors-spark-dist</artifactId>
 
     <dependencies>
-        <dependency>
-            <groupId>org.apache.seatunnel</groupId>
-            <artifactId>seatunnel-connector-spark-kafka</artifactId>
-            <version>${project.version}</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>org.apache.seatunnel</groupId>-->
+<!--            <artifactId>seatunnel-connector-spark-kafka</artifactId>-->
+<!--            <version>${project.version}</version>-->
+<!--        </dependency>-->
 
         <dependency>
             <groupId>org.apache.seatunnel</groupId>
@@ -54,11 +54,11 @@
             <version>${project.version}</version>
         </dependency>
 
-        <dependency>
-            <groupId>org.apache.seatunnel</groupId>
-            <artifactId>seatunnel-connector-spark-elasticsearch</artifactId>
-            <version>${project.version}</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>org.apache.seatunnel</groupId>-->
+<!--            <artifactId>seatunnel-connector-spark-elasticsearch</artifactId>-->
+<!--            <version>${project.version}</version>-->
+<!--        </dependency>-->
 
         <dependency>
             <groupId>org.apache.seatunnel</groupId>
@@ -66,17 +66,17 @@
             <version>${project.version}</version>
         </dependency>
 
-        <dependency>
-            <groupId>org.apache.seatunnel</groupId>
-            <artifactId>seatunnel-connector-spark-phoenix</artifactId>
-            <version>${project.version}</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.apache.thrift</groupId>
-                    <artifactId>libthrift</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>org.apache.seatunnel</groupId>-->
+<!--            <artifactId>seatunnel-connector-spark-phoenix</artifactId>-->
+<!--            <version>${project.version}</version>-->
+<!--            <exclusions>-->
+<!--                <exclusion>-->
+<!--                    <groupId>org.apache.thrift</groupId>-->
+<!--                    <artifactId>libthrift</artifactId>-->
+<!--                </exclusion>-->
+<!--            </exclusions>-->
+<!--        </dependency>-->
 
         <dependency>
             <groupId>org.apache.seatunnel</groupId>
@@ -90,11 +90,11 @@
             <version>${project.version}</version>
         </dependency>
 
-        <dependency>
-            <groupId>org.apache.seatunnel</groupId>
-            <artifactId>seatunnel-connector-spark-kudu</artifactId>
-            <version>${project.version}</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>org.apache.seatunnel</groupId>-->
+<!--            <artifactId>seatunnel-connector-spark-kudu</artifactId>-->
+<!--            <version>${project.version}</version>-->
+<!--        </dependency>-->
 
         <dependency>
             <groupId>org.apache.seatunnel</groupId>
@@ -114,17 +114,17 @@
             <version>${project.version}</version>
         </dependency>
 
-        <dependency>
-            <groupId>org.apache.seatunnel</groupId>
-            <artifactId>seatunnel-connector-spark-hbase</artifactId>
-            <version>${project.version}</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>org.apache.seatunnel</groupId>-->
+<!--            <artifactId>seatunnel-connector-spark-hbase</artifactId>-->
+<!--            <version>${project.version}</version>-->
+<!--        </dependency>-->
 
-        <dependency>
-            <groupId>org.apache.seatunnel</groupId>
-            <artifactId>seatunnel-connector-spark-hudi</artifactId>
-            <version>${project.version}</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>org.apache.seatunnel</groupId>-->
+<!--            <artifactId>seatunnel-connector-spark-hudi</artifactId>-->
+<!--            <version>${project.version}</version>-->
+<!--        </dependency>-->
 
         <dependency>
             <groupId>org.apache.seatunnel</groupId>
@@ -138,17 +138,17 @@
             <version>${project.version}</version>
         </dependency>
 
-        <dependency>
-            <groupId>org.apache.seatunnel</groupId>
-            <artifactId>seatunnel-connector-spark-neo4j</artifactId>
-            <version>${project.version}</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>org.apache.seatunnel</groupId>-->
+<!--            <artifactId>seatunnel-connector-spark-neo4j</artifactId>-->
+<!--            <version>${project.version}</version>-->
+<!--        </dependency>-->
 
-        <dependency>
-            <groupId>org.apache.seatunnel</groupId>
-            <artifactId>seatunnel-connector-spark-iceberg</artifactId>
-            <version>${project.version}</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>org.apache.seatunnel</groupId>-->
+<!--            <artifactId>seatunnel-connector-spark-iceberg</artifactId>-->
+<!--            <version>${project.version}</version>-->
+<!--        </dependency>-->
 
         <dependency>
             <groupId>org.apache.seatunnel</groupId>
@@ -162,11 +162,11 @@
             <version>${project.version}</version>
         </dependency>
 
-        <dependency>
-            <groupId>org.apache.seatunnel</groupId>
-            <artifactId>seatunnel-connector-spark-webhook</artifactId>
-            <version>${project.version}</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>org.apache.seatunnel</groupId>-->
+<!--            <artifactId>seatunnel-connector-spark-webhook</artifactId>-->
+<!--            <version>${project.version}</version>-->
+<!--        </dependency>-->
     </dependencies>
 
     <build>
