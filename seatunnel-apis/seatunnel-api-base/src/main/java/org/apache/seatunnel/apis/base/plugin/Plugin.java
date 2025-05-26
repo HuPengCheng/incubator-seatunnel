@@ -46,6 +46,8 @@ public interface Plugin<T extends RuntimeEnv> extends Serializable, AutoCloseabl
     String CONFIG_DROP_MODE = "drop.mode";
     String CONFIG_TASK_ID = "task.id";
     String FIELD_ETL_TASK_ID = "ETLTASKID";
+    String SOURCE_COLUMNS = "source_columns";
+    String DISTINCT_FLAG = "distinct_flag";
     String SINK_COLUMNS = "sink_columns";
     String PARTITION_BY = "partition_by";
 

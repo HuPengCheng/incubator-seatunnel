@@ -17,7 +17,9 @@
 
 package org.apache.seatunnel.spark;
 
+import static org.apache.seatunnel.apis.base.plugin.Plugin.DISTINCT_FLAG;
 import static org.apache.seatunnel.apis.base.plugin.Plugin.RESULT_TABLE_NAME;
+import static org.apache.seatunnel.apis.base.plugin.Plugin.SOURCE_COLUMNS;
 import static org.apache.seatunnel.apis.base.plugin.Plugin.SOURCE_TABLE_NAME;
 
 import org.apache.seatunnel.apis.base.env.RuntimeEnv;
@@ -31,9 +33,11 @@ import org.apache.seatunnel.shade.com.typesafe.config.ConfigFactory;
 import org.apache.seatunnel.spark.encrypt.Encryptor;
 import org.apache.seatunnel.spark.encrypt.SqlUdf;
 import org.apache.spark.SparkConf;
+import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.functions;
 import org.apache.spark.streaming.Seconds;
 import org.apache.spark.streaming.StreamingContext;
 import org.slf4j.Logger;
@@ -41,6 +45,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URL;
 import java.util.List;
+import java.util.Objects;
 
 public class SparkEnvironment implements RuntimeEnv {
 
@@ -146,12 +151,38 @@ public class SparkEnvironment implements RuntimeEnv {
         if (config.hasPath(RESULT_TABLE_NAME)) {
             String tableName = config.getString(RESULT_TABLE_NAME);
             Dataset<Row> data = source.getData(environment);
+            data = prepareSourceDataset(config, data);
             registerTempView(tableName, data);
             return data;
         } else {
             throw new ConfigRuntimeException("Plugin[" + source.getClass().getName() + "] " +
                     "must be registered as dataset/table, please set \"" + RESULT_TABLE_NAME + "\" config");
         }
+    }
+
+    private static Dataset<Row> prepareSourceDataset(Config config, Dataset<Row> data) {
+        String[] sourceColumns = null;
+        if (config.hasPath(SOURCE_COLUMNS)) {
+            sourceColumns = config.getString(SOURCE_COLUMNS).split(",");
+            data = data.selectExpr(sourceColumns);
+        }
+        if (config.hasPath(DISTINCT_FLAG)) {
+            // 按第一个字段group by，其他字段取last
+            if (Objects.isNull(sourceColumns)) {
+                sourceColumns = data.columns();
+            }
+            if (sourceColumns.length < 2) {
+                throw new ConfigRuntimeException("Plugin[" + config.getString(RESULT_TABLE_NAME) + "] " +
+                        "must have at least two columns to perform distinct operation");
+            }
+            Column[] aggColumns = new Column[sourceColumns.length - 2];
+            for (int i = 2; i < sourceColumns.length; i++) {
+                aggColumns[i - 1] = functions.last(sourceColumns[i], false);
+            }
+            data = data.groupBy(sourceColumns[0])
+                    .agg(functions.last(sourceColumns[1], false), aggColumns);
+        }
+        return data;
     }
 
     public static Dataset<Row> transformProcess(SparkEnvironment environment, BaseSparkTransform transform, Dataset<Row> ds) {
