@@ -103,5 +103,19 @@ class Hive extends SparkBatchSink with Logging {
     }
   }
 
+  override def cleanAllDataInSink(env: SparkEnvironment): Unit = {
+    val sparkSession = env.getSparkSession
+    if (config.hasPath("result_table_name")) {
+      val resultTableName = config.getString("result_table_name")
+      if (sparkSession.catalog.tableExists(resultTableName)) {
+        sparkSession.sql(s"TRUNCATE TABLE $resultTableName")
+      } else {
+        log.warn(s"Table $resultTableName does not exist, skipping truncate operation.")
+      }
+    } else {
+      log.warn("No result_table_name specified, cannot clean data.")
+    }
+  }
+
   override def getPluginName: String = "Hive"
 }
