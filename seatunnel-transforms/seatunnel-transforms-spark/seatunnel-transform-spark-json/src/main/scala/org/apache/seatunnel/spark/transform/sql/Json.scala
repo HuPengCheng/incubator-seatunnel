@@ -15,12 +15,12 @@
  * limitations under the License.
  */
 
-package org.apache.seatunnel.spark.transform
+package org.apache.seatunnel.spark.transform.sql
 
 import org.apache.seatunnel.common.config.{Common, ConfigRuntimeException}
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigFactory
 import org.apache.seatunnel.spark.{BaseSparkTransform, SparkEnvironment}
-import org.apache.seatunnel.spark.transform.JsonConfig._
+import JsonConfig._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{Dataset, Row, SparkSession}

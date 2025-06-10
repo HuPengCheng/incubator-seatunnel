@@ -1,3 +1,5 @@
+
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -15,16 +17,11 @@
  * limitations under the License.
  */
 
-package org.apache.seatunnel.spark.transform
+package org.apache.seatunnel.spark.transform.sql
 
-object JsonConfig {
-  val PLUGIN_NAME = "json"
-
+object NullRateConfig {
   val FIELDS = "fields"
-  val SOURCE_FILED = "source_field"
-  val DEFAULT_SOURCE_FILED = "raw_message"
-  val TARGET_FILED = "target_field"
-  val SCHEMA_DIR = "schema_dir"
-  val SCHEMA_FILE = "schema_file"
-  val DEFAULT_SCHEMA_FILE = ""
+  val RATES = "rates"
+  val IS_THROWEXCEPTION = "throw_exception_enable"
+  val SAVE_TO_TABLE_NAME = "save_to_table_name"
 }

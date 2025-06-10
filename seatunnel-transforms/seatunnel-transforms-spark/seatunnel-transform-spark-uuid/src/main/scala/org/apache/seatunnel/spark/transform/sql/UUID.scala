@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.seatunnel.spark.transform
+package org.apache.seatunnel.spark.transform.sql
 
 import java.security.SecureRandom
 
@@ -28,7 +28,7 @@ import org.apache.seatunnel.common.config.CheckConfigUtil.checkAllExists
 import org.apache.seatunnel.common.config.CheckResult
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigFactory
 import org.apache.seatunnel.spark.{BaseSparkTransform, SparkEnvironment}
-import org.apache.seatunnel.spark.transform.UUIDConfig._
+import UUIDConfig._
 import org.apache.spark.sql.{Dataset, Row}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.{col, udf}

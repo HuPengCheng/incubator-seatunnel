@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.seatunnel.spark.transform
+package org.apache.seatunnel.spark.transform.sql
 
 import junit.framework.TestCase.assertEquals
 import org.junit.Test

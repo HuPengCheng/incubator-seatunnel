@@ -15,31 +15,19 @@
  * limitations under the License.
  */
 
-package org.apache.seatunnel.spark.transform
+package org.apache.seatunnel.spark.transform.sql
 
-import java.security.SecureRandom
+object ReplaceConfig {
+  val PLUGIN_NAME = "replace"
+  val UDF_NAME = "Replace"
 
-import junit.framework.TestCase.assertEquals
-import org.apache.commons.math3.random.Well19937c
-import org.junit.Test
-
-class TestUUID {
-  @Test
-  def testUuid() {
-    val UUID = new UUID
-    assertEquals(36, UUID.generate("").length)
-    assertEquals(37, UUID.generate("u").length)
-  }
-
-  @Test
-  def testSecureUuid() {
-    val rand = new SecureRandom
-    val seed = for (_ <- 0 until 728) yield rand.nextInt
-    val prng = new Well19937c(seed.toArray)
-
-    val UUID = new UUID
-    UUID.setPrng(prng)
-    assertEquals(36, UUID.generate("").length)
-    assertEquals(37, UUID.generate("u").length)
-  }
+  val FIELDS = "fields"
+  val SOURCE_FILED = "source_field"
+  val DEFAULT_SOURCE_FILED = "raw_message"
+  val PATTERN = "pattern"
+  val REPLACEMENT = "replacement"
+  val REPLACE_REGEX = "is_regex"
+  val DEFAULT_REPLACE_REGEX = false
+  val REPLACE_FIRST = "replace_first"
+  val DEFAULT_REPLACE_FIRST = false
 }

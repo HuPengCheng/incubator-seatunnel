@@ -1,5 +1,3 @@
-
-
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -17,11 +15,31 @@
  * limitations under the License.
  */
 
-package org.apache.seatunnel.spark.transform
+package org.apache.seatunnel.spark.transform.sql
 
-object NullRateConfig {
-  val FIELDS = "fields"
-  val RATES = "rates"
-  val IS_THROWEXCEPTION = "throw_exception_enable"
-  val SAVE_TO_TABLE_NAME = "save_to_table_name"
+import java.security.SecureRandom
+
+import junit.framework.TestCase.assertEquals
+import org.apache.commons.math3.random.Well19937c
+import org.junit.Test
+
+class TestUUID {
+  @Test
+  def testUuid() {
+    val UUID = new UUID
+    assertEquals(36, UUID.generate("").length)
+    assertEquals(37, UUID.generate("u").length)
+  }
+
+  @Test
+  def testSecureUuid() {
+    val rand = new SecureRandom
+    val seed = for (_ <- 0 until 728) yield rand.nextInt
+    val prng = new Well19937c(seed.toArray)
+
+    val UUID = new UUID
+    UUID.setPrng(prng)
+    assertEquals(36, UUID.generate("").length)
+    assertEquals(37, UUID.generate("u").length)
+  }
 }

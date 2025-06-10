@@ -15,19 +15,16 @@
  * limitations under the License.
  */
 
-package org.apache.seatunnel.spark.transform
+package org.apache.seatunnel.spark.transform.sql
 
-object ReplaceConfig {
-  val PLUGIN_NAME = "replace"
-  val UDF_NAME = "Replace"
+object UUIDConfig {
+  val PLUGIN_NAME = "UUID"
+  val UDF_NAME = PLUGIN_NAME
 
   val FIELDS = "fields"
-  val SOURCE_FILED = "source_field"
   val DEFAULT_SOURCE_FILED = "raw_message"
-  val PATTERN = "pattern"
-  val REPLACEMENT = "replacement"
-  val REPLACE_REGEX = "is_regex"
-  val DEFAULT_REPLACE_REGEX = false
-  val REPLACE_FIRST = "replace_first"
-  val DEFAULT_REPLACE_FIRST = false
+  val UUID_PREFIX = "prefix"
+  val DEFAULT_UUID_PREFIX = ""
+  val UUID_SECURE = "secure"
+  val DEFAULT_UUID_SECURE = false
 }

@@ -15,4 +15,4 @@
 # limitations under the License.
 #
 
-org.apache.seatunnel.spark.transform.UUID
+org.apache.seatunnel.spark.transform.sql.UUID

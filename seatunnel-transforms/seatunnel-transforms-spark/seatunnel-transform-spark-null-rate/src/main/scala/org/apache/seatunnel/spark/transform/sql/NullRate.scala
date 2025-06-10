@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.seatunnel.spark.transform
+package org.apache.seatunnel.spark.transform.sql
 
 import org.apache.seatunnel.apis.base.plugin.Plugin
 import org.apache.seatunnel.common.config.CheckConfigUtil._

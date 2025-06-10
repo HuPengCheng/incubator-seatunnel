@@ -15,14 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.seatunnel.spark.transform
+package org.apache.seatunnel.spark.transform.sql
 
 import java.sql.Timestamp
 
 import org.apache.seatunnel.common.config.CheckConfigUtil.checkAllExists
 import org.apache.seatunnel.common.config.CheckResult
 import org.apache.seatunnel.spark.{BaseSparkTransform, SparkEnvironment}
-import org.apache.seatunnel.spark.transform.NulltfConfig._
+import NulltfConfig._
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.sql.types.{BooleanType, DataType, DateType, DoubleType, FloatType, IntegerType, LongType, ShortType, StringType, TimestampType}
 import org.apache.spark.sql.{Dataset, Row}

@@ -15,16 +15,11 @@
  * limitations under the License.
  */
 
-package org.apache.seatunnel.spark.transform
+package org.apache.seatunnel.spark.transform.sql
 
-object UUIDConfig {
-  val PLUGIN_NAME = "UUID"
-  val UDF_NAME = PLUGIN_NAME
+object NulltfConfig {
+  val PLUGIN_NAME = "nulltf"
 
   val FIELDS = "fields"
-  val DEFAULT_SOURCE_FILED = "raw_message"
-  val UUID_PREFIX = "prefix"
-  val DEFAULT_UUID_PREFIX = ""
-  val UUID_SECURE = "secure"
-  val DEFAULT_UUID_SECURE = false
+
 }
