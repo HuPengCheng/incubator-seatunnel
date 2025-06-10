@@ -162,25 +162,24 @@ public class SparkEnvironment implements RuntimeEnv {
 
     private static Dataset<Row> prepareSourceDataset(Config config, Dataset<Row> data) {
         String[] sourceColumns = null;
-        if (config.hasPath(SOURCE_COLUMNS)) {
-            sourceColumns = config.getString(SOURCE_COLUMNS).split(",");
-            data = data.selectExpr(sourceColumns);
-        }
         if (config.hasPath(DISTINCT_FLAG)) {
             // 按第一个字段group by，其他字段取last
-            if (Objects.isNull(sourceColumns)) {
-                sourceColumns = data.columns();
-            }
+            sourceColumns = data.columns();
             if (sourceColumns.length < 2) {
                 throw new ConfigRuntimeException("Plugin[" + config.getString(RESULT_TABLE_NAME) + "] " +
                         "must have at least two columns to perform distinct operation");
             }
             Column[] aggColumns = new Column[sourceColumns.length - 2];
             for (int i = 2; i < sourceColumns.length; i++) {
-                aggColumns[i - 1] = functions.last(sourceColumns[i], false);
+                aggColumns[i - 2] = functions.last(sourceColumns[i], false).as(sourceColumns[i]);
             }
             data = data.groupBy(sourceColumns[0])
-                    .agg(functions.last(sourceColumns[1], false), aggColumns);
+                    .agg(functions.last(sourceColumns[1], false).as(sourceColumns[1]), aggColumns);
+        }
+        if (config.hasPath(SOURCE_COLUMNS)) {
+            sourceColumns = config.getString(SOURCE_COLUMNS).split(",");
+            LOGGER.info("Plugin[{}] source columns: {}", config.getString(RESULT_TABLE_NAME), String.join(",", sourceColumns));
+            data = data.selectExpr(sourceColumns);
         }
         return data;
     }
