@@ -17,7 +17,7 @@ class ColumnReplace extends BaseSparkTransform {
     // 有序map存储字段名和输出的column的关系
     val columnOutputMap = scala.collection.mutable.LinkedHashMap[String, Column]()
     data.columns.foreach(column => {
-      columnOutputMap.put(column, col(f"master.${column}").as(column))
+      columnOutputMap.put(column.toUpperCase, col(f"master.${column}").as(column.toUpperCase))
     })
     var tableAliasSuffix = 0;
     for (rule <- rules) {
@@ -30,11 +30,13 @@ class ColumnReplace extends BaseSparkTransform {
       result = result.join(df, result(primaryColumn) === df(df.columns.head), "left")
       dfMap.put(tableName, df)
       columns.foreach(column => {
-        columnOutputMap.put(column, col(f"t${tableAliasSuffix}.${column}").as(column))
+        columnOutputMap.put(column.toUpperCase, col(f"t${tableAliasSuffix}.${column}").as(column.toUpperCase))
       })
     }
     columnOutputMap.values.toList
-    result.select(columnOutputMap.values.toList: _*)
+    result = result.select(columnOutputMap.values.toList: _*)
+    result.explain(true)
+    result
   }
 
 

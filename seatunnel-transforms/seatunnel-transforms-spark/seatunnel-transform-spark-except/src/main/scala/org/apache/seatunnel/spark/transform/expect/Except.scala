@@ -17,9 +17,11 @@ class Except extends BaseSparkTransform {
       return data
     }
     // select * from primaryDF left join expectDF on primaryDF.field1 = expectDF.field1 where expectDF.field1 is null
-    data.alias("left").join(expectDF.alias("right"), data(primaryField1) === expectDF(expectField1), "left")
+    val result = data.alias("left").join(expectDF.alias("right"), data(primaryField1) === expectDF(expectField1), "left")
       .filter(expectDF(expectField1).isNull)
       .select(data.columns.map(column => col(f"left.${column}").as(column)): _*)
+    result.explain(true)
+    result
   }
 
   private def hasIdNoUse(data: Dataset[Row]) = {

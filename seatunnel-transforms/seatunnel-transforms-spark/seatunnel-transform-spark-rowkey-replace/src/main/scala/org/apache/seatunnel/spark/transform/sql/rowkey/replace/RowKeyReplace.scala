@@ -22,7 +22,7 @@ class RowKeyReplace extends BaseSparkTransform {
     val columnOutputMap = scala.collection.mutable.LinkedHashMap[String, Column]()
     var result = data.alias("master")
     data.columns.foreach(column => {
-      columnOutputMap.put(column, data.col(column).as(column))
+      columnOutputMap.put(column.toUpperCase, col(s"master.${column}").as(column.toUpperCase))
     })
     var tableAliasSuffix = 0;
     for (rule <- rules) {
@@ -33,9 +33,11 @@ class RowKeyReplace extends BaseSparkTransform {
       val df = env.getSparkSession.sql(s"SELECT * FROM $tableName")
         .alias(s"t${tableAliasSuffix}")
       result = result.join(df, result(primaryColumn) === df(df.columns.head), "left")
-      columnOutputMap.put(primaryColumn, col(s"t${tableAliasSuffix}.${column}").as(primaryColumn))
+      columnOutputMap.put(primaryColumn.toUpperCase, col(s"t${tableAliasSuffix}.${column}").as(primaryColumn))
     }
-    result.select(columnOutputMap.values.toList: _*)
+    result = result.select(columnOutputMap.values.toList: _*)
+    result.explain(true)
+    result
   }
 
   /**
