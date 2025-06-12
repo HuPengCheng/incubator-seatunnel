@@ -181,6 +181,8 @@ public class SparkStarter implements Starter {
         }
         this.sparkConf.put("spark.yarn.keytab", System.getenv("SPARK_YARN_KEYTAB"));
         this.sparkConf.put("spark.yarn.principal", System.getenv("SPARK_YARN_PRINCIPAL"));
+        // spark.yarn.maxAppAttempts
+        this.sparkConf.put("spark.yarn.maxAppAttempts", "1");
     }
 
     /**

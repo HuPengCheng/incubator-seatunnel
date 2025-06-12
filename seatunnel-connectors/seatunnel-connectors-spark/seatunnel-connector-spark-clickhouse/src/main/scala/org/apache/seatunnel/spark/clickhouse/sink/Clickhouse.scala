@@ -35,7 +35,7 @@ import org.apache.seatunnel.shade.com.typesafe.config.ConfigFactory
 import org.apache.seatunnel.spark.SparkEnvironment
 import org.apache.seatunnel.spark.batch.SparkBatchSink
 import org.apache.seatunnel.spark.clickhouse.Config.{BULK_SIZE, DATABASE, DROP_MODE, FIELDS, HOST, PASSWORD, RETRY, RETRY_CODES, SHARDING_KEY, SPLIT_MODE, TABLE, TASK_ID, USERNAME}
-import org.apache.seatunnel.spark.clickhouse.sink.Clickhouse.{Shard, acceptedClickHouseSchema, distributedEngine, getClickHouseDistributedTable, getClickHouseSchema, getClickhouseConnection, getClusterShardList, getDefaultValue, getRowShard, parseHost}
+import org.apache.seatunnel.spark.clickhouse.sink.Clickhouse.{Shard, acceptedClickHouseSchema, distributedEngine, getClickHouseDistributedTable, getClickHousePartitionColumns, getClickHouseSchema, getClickhouseConnection, getClusterShardList, getDefaultValue, getRowShard, parseHost}
 import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import ru.yandex.clickhouse.{BalancedClickhouseDataSource, ClickHouseArray, ClickHouseConnectionImpl, ClickHousePreparedStatementImpl}
@@ -149,7 +149,6 @@ class Clickhouse extends SparkBatchSink {
       val conn = getClickhouseConnection(multiHosts, database, properties)
       this.table = config.getString(TABLE)
       this.tableSchema = getClickHouseSchema(conn, this.table).toMap
-      tablePrepare(conn)
       if (splitMode) {
         val tableName = config.getString(TABLE)
         val localTable = getClickHouseDistributedTable(conn, database, tableName)
@@ -204,32 +203,62 @@ class Clickhouse extends SparkBatchSink {
     retryCodes = config.getIntList(RETRY_CODES)
   }
 
-  private def tablePrepare(conn: ClickHouseConnectionImpl): Unit = {
-    if (config.hasPath(DROP_MODE)) {
-      if ("1".equals(config.getString(DROP_MODE))) {
-        // 基于taskid删除
-        if (tableSchema.keySet.map(c => c.toLowerCase).contains(ETL_TASK_ID.toLowerCase)) {
-          val deleteSql = s"ALTER TABLE ${config.getString(DATABASE)}.${config.getString(TABLE)} DELETE WHERE ${ETL_TASK_ID} = '${config.getString(TASK_ID)}'"
-          val optSql = s"OPTIMIZE TABLE ${config.getString(DATABASE)}.${config.getString(TABLE)} FINAL"
-          conn.createStatement().execute(deleteSql)
-          conn.createStatement().execute(optSql)
-        } else {
-          println("Can't find  ETLTASKID")
-        }
-      } else if ("0".equals(config.getString(DROP_MODE))) {
-        try {
-          val deleteSql = s"truncate table if exists ${config.getString(DATABASE)}.${config.getString(TABLE)}"
-          conn.createStatement().execute(deleteSql)
-        } catch {
-          case e: Exception =>
-            e.printStackTrace()
-        }
-      } else {
-        println("Dont delete!!!")
-      }
+  override def cleanAllDataInSink(env: SparkEnvironment): Unit = {
+    val database = config.getString(DATABASE)
+    val conn = getClickhouseConnection(multiHosts, database, properties)
+    val deleteSql = s"truncate table if exists ${config.getString(DATABASE)}.${config.getString(TABLE)}"
+    try {
+      conn.createStatement().execute(deleteSql)
+    } catch {
+      case e: Exception =>
+        e.printStackTrace()
+    } finally {
+      conn.close()
     }
   }
 
+  override def cleanDataByEtlIdInSink(env: SparkEnvironment): Unit = {
+    val database = config.getString(DATABASE)
+    val conn = getClickhouseConnection(multiHosts, database, properties)
+    try {
+      // 获取分区字段列表
+      val partitionColumns = getClickHousePartitionColumns(conn, database, config.getString(TABLE))
+      if (!partitionColumns.isEmpty && partitionColumns.contains(ETL_TASK_ID)) {
+        // If the ETLTASKID is a partition column, we can delete by partition
+        val partitions = partitionColumns.map(partition => s"'${config.getString(TASK_ID)}'").mkString(", ")
+        val deleteSql = s"ALTER TABLE ${config.getString(DATABASE)}.${config.getString(TABLE)} DROP PARTITION ($partitions)"
+        conn.createStatement().execute(deleteSql)
+      } else if (tableSchema.keySet.map(c => c.toLowerCase).contains(ETL_TASK_ID.toLowerCase)) {
+        val deleteSql = s"ALTER TABLE ${config.getString(DATABASE)}.${config.getString(TABLE)} DELETE WHERE ${ETL_TASK_ID} = '${config.getString(TASK_ID)}'"
+        val optSql = s"OPTIMIZE TABLE ${config.getString(DATABASE)}.${config.getString(TABLE)} FINAL"
+        conn.createStatement().execute(deleteSql)
+        conn.createStatement().execute(optSql)
+      } else {
+        println("Can't find  ETLTASKID")
+      }
+    } catch {
+      case e: Exception =>
+        e.printStackTrace()
+    } finally {
+      conn.close()
+    }
+  }
+
+  override def cleanDataByPartitionInSink(env: SparkEnvironment, partitionExprs: util.List[String]): Unit = {
+    val database = config.getString(DATABASE)
+    val conn = getClickhouseConnection(multiHosts, database, properties)
+    try {
+      // ALTER TABLE my_table DROP PARTITION ('2025-05-01', 'region1');
+      val partitions = partitionExprs.map(partition => s"'$partition'").mkString(", ")
+      val deleteSql = s"ALTER TABLE ${config.getString(DATABASE)}.${config.getString(TABLE)} DROP PARTITION ($partitions)"
+      conn.createStatement().execute(deleteSql)
+    } catch {
+      case e: Exception =>
+        e.printStackTrace()
+    } finally {
+      conn.close()
+    }
+  }
 
   private def initPrepareSQL(): String = {
 
@@ -525,6 +554,20 @@ object Clickhouse {
       schema.put(resultSet.getString(1), resultSet.getString(2))
     }
     schema
+  }
+
+  def getClickHousePartitionColumns(
+                                     conn: ClickHouseConnectionImpl,
+                                     database: String,
+                                     table: String): util.List[String] = {
+    val sql = String.format("select name from system.columns where database = '%s' and table = '%s' and is_in_partition_key = 1",
+      database, table)
+    val resultSet = conn.createStatement.executeQuery(sql)
+    val partitionColumns = new util.ArrayList[String]()
+    while (resultSet.next()) {
+      partitionColumns.add(resultSet.getString(1))
+    }
+    partitionColumns
   }
 
   @tailrec

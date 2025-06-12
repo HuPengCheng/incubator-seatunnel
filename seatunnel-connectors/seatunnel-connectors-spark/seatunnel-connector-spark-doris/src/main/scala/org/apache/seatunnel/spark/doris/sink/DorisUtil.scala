@@ -17,6 +17,7 @@
 
 package org.apache.seatunnel.spark.doris.sink
 
+import org.apache.commons.lang3.StringUtils
 import org.apache.commons.net.util.Base64
 import org.apache.http.HttpHeaders
 import org.apache.http.client.config.RequestConfig
@@ -24,6 +25,7 @@ import org.apache.http.client.methods.{CloseableHttpResponse, HttpPut}
 import org.apache.http.entity.StringEntity
 import org.apache.http.impl.client.{CloseableHttpClient, DefaultConnectionKeepAliveStrategy, DefaultRedirectStrategy, HttpClientBuilder}
 import org.apache.log4j.Logger
+import org.apache.seatunnel.common.utils.JsonUtils
 
 import java.io.{BufferedReader, InputStreamReader}
 import java.nio.charset.{Charset, StandardCharsets}
@@ -82,14 +84,20 @@ object DorisUtil extends Serializable {
         stringBuffer.append(str.trim)
         str = bufferReader.readLine()
       }
+      val responseMessage = stringBuffer.toString
+      val jsonResponse = JsonUtils.toMap(responseMessage)
+      if (StringUtils.equalsIgnoreCase(jsonResponse.get("Status"), "Fail")) {
+          status = false
+          throw new RuntimeException(s"Doris Stream load failed, response: $responseMessage")
+      }
       LOG.info(
         s"""
            |Batch Messages Response:
-           |${stringBuffer.toString}
+           |$responseMessage
            |""".stripMargin)
     } catch {
-      case _: Exception => status = false
-        (status, httpclient, response)
+      case e: Exception => status = false
+        throw e;
     }
     LOG.info("Doris stream load finished, status: " + status + ", response: " + response)
     (status, httpclient, response)

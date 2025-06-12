@@ -17,9 +17,13 @@
 
 package org.apache.seatunnel.spark;
 
+import static org.apache.seatunnel.apis.base.plugin.Plugin.DISTINCT_FLAG;
 import static org.apache.seatunnel.apis.base.plugin.Plugin.RESULT_TABLE_NAME;
+import static org.apache.seatunnel.apis.base.plugin.Plugin.SOURCE_COLUMNS;
 import static org.apache.seatunnel.apis.base.plugin.Plugin.SOURCE_TABLE_NAME;
 
+import com.google.common.collect.Sets;
+import org.apache.commons.lang.StringUtils;
 import org.apache.seatunnel.apis.base.env.RuntimeEnv;
 import org.apache.seatunnel.common.config.CheckResult;
 import org.apache.seatunnel.common.config.ConfigRuntimeException;
@@ -31,16 +35,23 @@ import org.apache.seatunnel.shade.com.typesafe.config.ConfigFactory;
 import org.apache.seatunnel.spark.encrypt.Encryptor;
 import org.apache.seatunnel.spark.encrypt.SqlUdf;
 import org.apache.spark.SparkConf;
+import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.functions;
 import org.apache.spark.streaming.Seconds;
 import org.apache.spark.streaming.StreamingContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URL;
+import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class SparkEnvironment implements RuntimeEnv {
 
@@ -146,12 +157,47 @@ public class SparkEnvironment implements RuntimeEnv {
         if (config.hasPath(RESULT_TABLE_NAME)) {
             String tableName = config.getString(RESULT_TABLE_NAME);
             Dataset<Row> data = source.getData(environment);
+            data = prepareSourceDataset(config, data);
             registerTempView(tableName, data);
             return data;
         } else {
             throw new ConfigRuntimeException("Plugin[" + source.getClass().getName() + "] " +
                     "must be registered as dataset/table, please set \"" + RESULT_TABLE_NAME + "\" config");
         }
+    }
+
+    private static Dataset<Row> prepareSourceDataset(Config config, Dataset<Row> data) {
+        String[] sourceColumns = null;
+        if (config.hasPath(DISTINCT_FLAG)) {
+            // 按第一个字段group by，其他字段取last
+            sourceColumns = data.columns();
+            if (sourceColumns.length < 2) {
+                throw new ConfigRuntimeException("Plugin[" + config.getString(RESULT_TABLE_NAME) + "] " +
+                        "must have at least two columns to perform distinct operation");
+            }
+            Column[] aggColumns = new Column[sourceColumns.length - 2];
+            for (int i = 2; i < sourceColumns.length; i++) {
+                aggColumns[i - 2] = functions.last(sourceColumns[i], false).as(sourceColumns[i]);
+            }
+            data = data.groupBy(sourceColumns[0])
+                    .agg(functions.last(sourceColumns[1], false).as(sourceColumns[1]), aggColumns);
+        }
+        if (config.hasPath(SOURCE_COLUMNS)) {
+            List<String> sourceColumnList = new LinkedList<>();
+            Set<String> dfColumns = Arrays.stream(data.columns()).map(String::toUpperCase).collect(Collectors.toSet());
+            sourceColumns = config.getString(SOURCE_COLUMNS).split(",");
+            for (String sourceColumn : sourceColumns) {
+                if (dfColumns.contains(sourceColumn.toUpperCase())) {
+                    sourceColumnList.add(sourceColumn);
+                } else {
+                    LOGGER.warn("Plugin[{}] source column [{}] not found in dataset, will be ignored",
+                            config.getString(RESULT_TABLE_NAME), sourceColumn);
+                }
+            }
+            LOGGER.info("Plugin[{}] source columns: {}", config.getString(RESULT_TABLE_NAME), String.join(",", sourceColumnList));
+            data = data.selectExpr(sourceColumns);
+        }
+        return data;
     }
 
     public static Dataset<Row> transformProcess(SparkEnvironment environment, BaseSparkTransform transform, Dataset<Row> ds) {

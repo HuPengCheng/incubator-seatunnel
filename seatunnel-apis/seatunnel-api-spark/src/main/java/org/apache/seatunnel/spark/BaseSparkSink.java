@@ -17,6 +17,7 @@
 
 package org.apache.seatunnel.spark;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.seatunnel.apis.base.api.BaseSink;
 
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
@@ -84,7 +85,7 @@ public abstract class BaseSparkSink<OUT> implements BaseSink<SparkEnvironment> {
 
 
     public Dataset<Row> cleanDataset(Dataset<Row> data, SparkEnvironment env) {
-        if (config.hasPath(SINK_COLUMNS) && !config.getString(SINK_COLUMNS).isEmpty()) {
+        if (config.hasPath(SINK_COLUMNS) && StringUtils.isNotEmpty(config.getString(SINK_COLUMNS))) {
             String[] sinkColumns = config.getString(SINK_COLUMNS).split(",");
 //            if (sinkColumns.length == 1) {
 //                data = data.select(sinkColumns[0]);
