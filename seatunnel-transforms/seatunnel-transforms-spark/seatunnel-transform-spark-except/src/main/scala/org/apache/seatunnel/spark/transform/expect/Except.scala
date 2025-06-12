@@ -1,6 +1,7 @@
 package org.apache.seatunnel.spark.transform.expect
 
 import org.apache.seatunnel.spark.{BaseSparkTransform, SparkEnvironment}
+import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.{Dataset, Row}
 
 class Except extends BaseSparkTransform {
@@ -16,9 +17,9 @@ class Except extends BaseSparkTransform {
       return data
     }
     // select * from primaryDF left join expectDF on primaryDF.field1 = expectDF.field1 where expectDF.field1 is null
-    data.join(expectDF, data(primaryField1) === expectDF(expectField1), "left")
+    data.alias("left").join(expectDF.alias("right"), data(primaryField1) === expectDF(expectField1), "left")
       .filter(expectDF(expectField1).isNull)
-      .select(data.columns.map(col => data(col)): _*)
+      .select(data.columns.map(column => col(f"left.${column}").as(column)): _*)
   }
 
   private def hasIdNoUse(data: Dataset[Row]) = {

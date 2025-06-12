@@ -1,6 +1,7 @@
 package org.apache.seatunnel.spark.transform.sql.rowkey.replace
 
 import org.apache.seatunnel.spark.{BaseSparkTransform, SparkEnvironment}
+import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.{Column, Dataset, Row}
 
 import scala.collection.JavaConverters.iterableAsScalaIterableConverter
@@ -19,19 +20,21 @@ class RowKeyReplace extends BaseSparkTransform {
   override def process(data: Dataset[Row], env: SparkEnvironment): Dataset[Row] = {
     val rules = config.getStringList("rules").asScala
     val columnOutputMap = scala.collection.mutable.LinkedHashMap[String, Column]()
-    var result = data
+    var result = data.alias("master")
     data.columns.foreach(column => {
       columnOutputMap.put(column, data.col(column).as(column))
     })
-
-    rules.foreach(rule => {
+    var tableAliasSuffix = 0;
+    for (rule <- rules) {
+      tableAliasSuffix += 1
       val primaryColumn = rule.split("=>").head.split(":").last
       val tableName = rule.split("=>").last.split(":").head
       val column = rule.split("=>").last.split(":").last
       val df = env.getSparkSession.sql(s"SELECT * FROM $tableName")
+        .alias(s"t${tableAliasSuffix}")
       result = result.join(df, result(primaryColumn) === df(df.columns.head), "left")
-      columnOutputMap.put(primaryColumn, df.col(column).as(primaryColumn))
-    })
+      columnOutputMap.put(primaryColumn, col(s"t${tableAliasSuffix}.${column}").as(primaryColumn))
+    }
     result.select(columnOutputMap.values.toList: _*)
   }
 

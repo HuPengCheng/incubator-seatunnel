@@ -31,7 +31,6 @@
     <modules>
         <module>seatunnel-transforms-flink</module>
         <module>seatunnel-transforms-spark</module>
-        <module>seatunnel-transform-spark-customer-center-decrypt</module>
     </modules>
 
 </project>
