@@ -22,6 +22,8 @@ import static org.apache.seatunnel.apis.base.plugin.Plugin.RESULT_TABLE_NAME;
 import static org.apache.seatunnel.apis.base.plugin.Plugin.SOURCE_COLUMNS;
 import static org.apache.seatunnel.apis.base.plugin.Plugin.SOURCE_TABLE_NAME;
 
+import com.google.common.collect.Sets;
+import org.apache.commons.lang.StringUtils;
 import org.apache.seatunnel.apis.base.env.RuntimeEnv;
 import org.apache.seatunnel.common.config.CheckResult;
 import org.apache.seatunnel.common.config.ConfigRuntimeException;
@@ -44,8 +46,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URL;
+import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class SparkEnvironment implements RuntimeEnv {
 
@@ -177,8 +183,18 @@ public class SparkEnvironment implements RuntimeEnv {
                     .agg(functions.last(sourceColumns[1], false).as(sourceColumns[1]), aggColumns);
         }
         if (config.hasPath(SOURCE_COLUMNS)) {
+            List<String> sourceColumnList = new LinkedList<>();
+            Set<String> dfColumns = Arrays.stream(data.columns()).map(String::toUpperCase).collect(Collectors.toSet());
             sourceColumns = config.getString(SOURCE_COLUMNS).split(",");
-            LOGGER.info("Plugin[{}] source columns: {}", config.getString(RESULT_TABLE_NAME), String.join(",", sourceColumns));
+            for (String sourceColumn : sourceColumns) {
+                if (dfColumns.contains(sourceColumn.toUpperCase())) {
+                    sourceColumnList.add(sourceColumn);
+                } else {
+                    LOGGER.warn("Plugin[{}] source column [{}] not found in dataset, will be ignored",
+                            config.getString(RESULT_TABLE_NAME), sourceColumn);
+                }
+            }
+            LOGGER.info("Plugin[{}] source columns: {}", config.getString(RESULT_TABLE_NAME), String.join(",", sourceColumnList));
             data = data.selectExpr(sourceColumns);
         }
         return data;
