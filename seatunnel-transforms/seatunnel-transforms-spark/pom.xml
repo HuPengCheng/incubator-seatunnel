@@ -37,7 +37,8 @@
         <module>seatunnel-transform-spark-nulltf</module>
         <module>seatunnel-transform-spark-null-rate</module>
         <module>seatunnel-transform-spark-except</module>
-        <module>seatunnel-transform-spark-union-all</module>
+        <module>seatunnel-transform-spark-union</module>
         <module>seatunnel-transform-spark-column-replace</module>
+        <module>seatunnel-transform-spark-rowkey-replace</module>
     </modules>
 </project>
