@@ -15,4 +15,4 @@
 # limitations under the License.
 #
 
-org.apache.seatunnel.spark.transform.sql.rowkey.replace.RowKeyReplace
+org.apache.seatunnel.spark.transform.rowkey.replace.RowKeyReplace
