@@ -15,16 +15,11 @@
  * limitations under the License.
  */
 
-package org.apache.seatunnel.spark.transform.sql
+package org.apache.seatunnel.spark.transform
 
-object SplitConfig {
-  val PLUGIN_NAME = "split"
-  val UDF_NAME = "Split"
+object NulltfConfig {
+  val PLUGIN_NAME = "nulltf"
 
   val FIELDS = "fields"
-  val SOURCE_FILED = "source_field"
-  val DEFAULT_SOURCE_FILED = "raw_message"
-  val TARGET_FILED = "target_field"
-  val SPLIT_SEPARATOR = "separator"
-  val DEFAULT_SPLIT_SEPARATOR = " "
+
 }

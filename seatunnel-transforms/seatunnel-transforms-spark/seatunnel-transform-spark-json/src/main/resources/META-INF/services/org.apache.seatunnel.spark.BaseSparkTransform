@@ -15,4 +15,4 @@
 # limitations under the License.
 #
 
-org.apache.seatunnel.spark.transform.sql.Json
+org.apache.seatunnel.spark.transform.Json

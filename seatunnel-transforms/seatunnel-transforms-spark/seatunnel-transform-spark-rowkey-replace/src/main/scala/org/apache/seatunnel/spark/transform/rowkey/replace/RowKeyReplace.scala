@@ -1,4 +1,4 @@
-package org.apache.seatunnel.spark.transform.sql.rowkey.replace
+package org.apache.seatunnel.spark.transform.rowkey.replace
 
 import org.apache.seatunnel.spark.{BaseSparkTransform, SparkEnvironment}
 import org.apache.spark.sql.functions.col

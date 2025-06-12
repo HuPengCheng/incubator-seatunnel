@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.seatunnel.spark.transform.sql
+package org.apache.seatunnel.spark.transform
 
 import java.sql.Timestamp
 

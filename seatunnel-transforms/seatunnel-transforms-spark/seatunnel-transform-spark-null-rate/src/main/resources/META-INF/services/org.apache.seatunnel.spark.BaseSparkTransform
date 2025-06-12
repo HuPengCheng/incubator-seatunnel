@@ -15,4 +15,4 @@
 # limitations under the License.
 #
 
-org.apache.seatunnel.spark.transform.sql.NullRate
+org.apache.seatunnel.spark.transform.NullRate
